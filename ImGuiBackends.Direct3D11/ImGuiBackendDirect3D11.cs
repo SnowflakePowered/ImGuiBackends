@@ -13,12 +13,15 @@ namespace ImGuiBackends.Direct3D11
     // todo: use nativearray
     public class ImGuiBackendDirect3D11
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool CheckDxError(int error, string title)
         {
-            if (error != 0)
+#if DEBUG
+            if (error < 0)
             {
-                Console.WriteLine($"{title}: {error.ToString("x")}");
+                Debug.WriteLine($"{title}: {error:x}");
             }
+#endif
             return error < 0;
         }
 
@@ -36,13 +39,12 @@ namespace ImGuiBackends.Direct3D11
         private unsafe ID3D11RasterizerState* _pRasterizerState;
         private unsafe ID3D11BlendState* _pBlendState;
         private unsafe ID3D11DepthStencilState* _pDepthStencilState;
-        int _vertexBufferSize;
-        int _indexBufferSize;
+        private int _vertexBufferSize;
+        private int _indexBufferSize;
+
         private static unsafe readonly byte* CSTR_POSITION = (byte*)SilkMarshal.StringToPtr("POSITION");
         private static unsafe readonly byte* CSTR_TEXCOORD = (byte*)SilkMarshal.StringToPtr("TEXCOORD");
         private static unsafe readonly byte* CSTR_COLOR = (byte*)SilkMarshal.StringToPtr("COLOR");
-
-        private static readonly float[] blend_factor = new float[] { 0, 0, 0, 0 };
 
         private unsafe void SetupRenderState(in ImDrawDataPtr drawData)
         {
@@ -78,10 +80,9 @@ namespace ImGuiBackends.Direct3D11
 
 
             // Setup blend state
-            fixed (float* bf = blend_factor)
-            {
-                _deviceContext->OMSetBlendState(_pBlendState, bf, 0xffffffff);
-            }
+            Vector4 blendFactor = new(0, 0, 0, 0);
+            _deviceContext->OMSetBlendState(_pBlendState, (float*)&blendFactor, 0xffffffff);
+
             _deviceContext->OMSetDepthStencilState(_pDepthStencilState, 0);
             _deviceContext->RSSetState(_pRasterizerState);
         }
@@ -90,16 +91,10 @@ namespace ImGuiBackends.Direct3D11
         {
             // Avoid rendering when minimized
             if (drawData.DisplaySize.X <= 0 || drawData.DisplaySize.Y <= 0)
-            {
-                Console.WriteLine("minimized");
                 return;
-            }
 
-            //if (!drawData.Valid || drawData.CmdListsCount == 0)
-            //{
-            //    Console.WriteLine("drawdata invalid");
-            //    return;
-            //}
+            if (!drawData.Valid || drawData.CmdListsCount == 0)
+                return;
 
             ID3D11DeviceContext* deviceContext = _deviceContext;
 
@@ -154,10 +149,7 @@ namespace ImGuiBackends.Direct3D11
             {
                 MappedSubresource vtxResource = new(), idxResource = new();
                 if (_pVB == null || _pIB == null)
-                {
-                    Console.WriteLine("buffers null");
                     return;
-                }
                 // if this doesn't work then we need to queryinterface :(
                 if (CheckDxError(deviceContext->Map((ID3D11Resource*)_pVB, 0, Map.MapWriteDiscard, 0, &vtxResource), "Map VTX"))
                     return;
@@ -211,15 +203,13 @@ namespace ImGuiBackends.Direct3D11
                 deviceContext->Unmap((ID3D11Resource*)_pVertexConstantBuffer, 0);
             }
 
-            //using D3D11StateBackup backup = this.StateBackup();
+            using D3D11StateBackup backup = this.StateBackup();
             this.SetupRenderState(drawData);
 
             // Render command lists
-            //this.RenderDoc.API.StartFrameCapture((IntPtr)_pd3dDevice, IntPtr.Zero);
             // (Because we merged all buffers into a single one, we maintain our own offset into them)
             int globalIdxOffset = 0;
             int globalVtxOffset = 0;
-            //Console.WriteLine($"Rendering {drawData.CmdListsCount} cmd lists displaySize: {drawData.DisplaySize}");
 
             Vector2 clipOff = drawData.DisplayPos;
             for (int n = 0; n < drawData.CmdListsCount; n++)
@@ -245,10 +235,7 @@ namespace ImGuiBackends.Direct3D11
                         Vector2 clipMin = new(cmdPtr.ClipRect.X - clipOff.X, cmdPtr.ClipRect.Y - clipOff.Y);
                         Vector2 clipMax = new(cmdPtr.ClipRect.Z - clipOff.X, cmdPtr.ClipRect.W - clipOff.Y);
                         if (clipMax.X <= clipMin.X || clipMax.Y <= clipMin.Y)
-                        {
-                            Console.WriteLine("clip");
                             continue;
-                        }
 
                         // Apply scissor/clipping rectangle
                         Rectangle<int> r = new((int)clipMin.X, (int)clipMin.Y, (int)clipMax.X, (int)clipMax.Y);
@@ -265,9 +252,7 @@ namespace ImGuiBackends.Direct3D11
                 globalIdxOffset += cmdList.IdxBuffer.Size;
                 globalVtxOffset += cmdList.VtxBuffer.Size;
             }
-            //this.RenderDoc.API.EndFrameCapture((IntPtr)this._pd3dDevice, IntPtr.Zero);
-
-            //this.RestoreState(backup);
+            this.RestoreState(backup);
 
             // backup disposed here.
         }
@@ -278,25 +263,14 @@ namespace ImGuiBackends.Direct3D11
             deviceContext->IASetInputLayout(backup.InputLayout);
             deviceContext->IASetIndexBuffer(backup.IndexBuffer, backup.IndexBufferFormat, backup.IndexBufferOffset);
             deviceContext->IASetPrimitiveTopology(backup.PrimitiveTopology);
-
-            fixed (ID3D11Buffer** buffers = backup.VertexBuffers)
-            fixed (uint* vbs = backup.VertexBufferStrides)
-            fixed (uint* vbo = backup.VertexBufferOffsets)
-            {
-                deviceContext->IASetVertexBuffers(0, (uint)backup.VertexBuffers.Length, buffers,
-                    vbs, vbo);
-            }
+            deviceContext->IASetVertexBuffers(0, (uint)backup.VertexBuffers.Length, backup.VertexBuffers,
+                   backup.VertexBufferStrides, backup.VertexBufferOffsets);
 
             // -- RS
             deviceContext->RSSetState(backup.RS);
-            deviceContext->RSSetScissorRects(backup.ScissorRectsCount, scissorRects);
-            deviceContext->RSSetViewports(backup.ViewportsCount, viewports);
-            fixed (Rectangle<int>* scissorRects = backup.ScissorRects)
-            fixed (Viewport* viewports = backup.Viewports)
-            {
-               
-            }
-
+            deviceContext->RSSetScissorRects(backup.ScissorRectsCount, backup.ScissorRects);
+            deviceContext->RSSetViewports(backup.ViewportsCount, backup.Viewports);
+            
             // -- OM
             fixed (float* blendFlactor = backup.BlendFactor)
             fixed (ID3D11RenderTargetView** renderTargetViews = backup.RenderTargetViews)
@@ -669,33 +643,35 @@ namespace ImGuiBackends.Direct3D11
 
             // -- IA
             // Allocate
-            backup.VertexBuffers = new ID3D11Buffer*[D3D11.IAVertexInputResourceSlotCount];
+            //backup.VertexBuffers = new ID3D11Buffer*[D3D11.IAVertexInputResourceSlotCount];
+            backup.VertexBuffers = new(D3D11.IAVertexInputResourceSlotCount);
+            backup.VertexBufferStrides = new(D3D11.IAVertexInputResourceSlotCount);
+            backup.VertexBufferOffsets = new(D3D11.IAVertexInputResourceSlotCount);
 
             deviceContext->IAGetInputLayout(&backup.InputLayout);
             deviceContext->IAGetIndexBuffer(&backup.IndexBuffer, &backup.IndexBufferFormat, &backup.IndexBufferOffset);
             deviceContext->IAGetPrimitiveTopology(&backup.PrimitiveTopology);
-
-            fixed (ID3D11Buffer** buffers = backup.VertexBuffers)
-            {
-                deviceContext->IAGetVertexBuffers(0, D3D11.IAVertexInputResourceSlotCount, buffers,
-                    backup.VertexBufferStrides, backup.VertexBufferOffsets);
-            }
+            deviceContext->IAGetVertexBuffers(0, D3D11.IAVertexInputResourceSlotCount, backup.VertexBuffers,
+                  backup.VertexBufferStrides, backup.VertexBufferOffsets);
 
             // -- RS
             // Allocate
             backup.ScissorRectsCount = D3D11.ViewportAndScissorrectObjectCountPerPipeline;
             backup.ViewportsCount = D3D11.ViewportAndScissorrectObjectCountPerPipeline;
-            backup.ScissorRects = new Rectangle<int>[backup.ScissorRectsCount];
-            backup.Viewports = new Viewport[backup.ViewportsCount];
+            backup.ScissorRects = new((int)backup.ScissorRectsCount);
+            backup.Viewports = new((int)backup.ViewportsCount);
 
             deviceContext->RSGetState(&backup.RS);
-            fixed (Rectangle<int>* scissorRects = backup.ScissorRects)
-            fixed (Viewport* viewports = backup.Viewports)
-            {
-                deviceContext->RSGetScissorRects(&backup.ScissorRectsCount, scissorRects);
-                deviceContext->RSGetViewports(&backup.ViewportsCount, viewports);
-            }
-            
+            deviceContext->RSGetScissorRects(&backup.ScissorRectsCount, backup.ScissorRects);
+            deviceContext->RSGetViewports(&backup.ViewportsCount, backup.Viewports);
+
+            //fixed (Rectangle<int>* scissorRects = backup.ScissorRects)
+            //fixed (Viewport* viewports = backup.Viewports)
+            //{
+            //    deviceContext->RSGetScissorRects(&backup.ScissorRectsCount, scissorRects);
+            //    deviceContext->RSGetViewports(&backup.ViewportsCount, viewports);
+            //}
+
             // -- OM
             // Allocate
             backup.RenderTargetViews = new ID3D11RenderTargetView*[D3D11.SimultaneousRenderTargetCount];

@@ -24,9 +24,9 @@ namespace ImGuiBackends.Direct3D11
         public Format IndexBufferFormat;
         public uint IndexBufferOffset;
 
-        public ID3D11Buffer*[] VertexBuffers;
-        public fixed uint VertexBufferStrides[D3D11.IAVertexInputResourceSlotCount];
-        public fixed uint VertexBufferOffsets[D3D11.IAVertexInputResourceSlotCount];
+        public NativeArray<ID3D11Buffer>.PointerArray VertexBuffers;
+        public NativeArray<uint> VertexBufferStrides;
+        public NativeArray<uint> VertexBufferOffsets;
 
         // RS
         public ID3D11RasterizerState* RS;
@@ -85,6 +85,10 @@ namespace ImGuiBackends.Direct3D11
                     buffer->Release();
             }
 
+            this.VertexBuffers.Dispose();
+            this.VertexBufferStrides.Dispose();
+            this.VertexBufferOffsets.Dispose();
+
             // RS
             if (this.RS != null)
                 this.RS->Release();
@@ -136,6 +140,9 @@ namespace ImGuiBackends.Direct3D11
                 if (uav != null)
                     uav->Release();
             }
+
+            this.ScissorRects.Dispose();
+            this.Viewports.Dispose();
             _isDisposed = true;
         }
     }
