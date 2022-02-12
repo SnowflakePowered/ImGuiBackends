@@ -10,8 +10,7 @@ using System.Runtime.InteropServices;
 
 namespace ImGuiBackends.Direct3D11
 {
-    // todo: use nativearray
-    public class ImGuiBackendDirect3D11
+    public partial class ImGuiBackendDirect3D11
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool CheckDxError(int error, string title)
@@ -41,7 +40,7 @@ namespace ImGuiBackends.Direct3D11
         private unsafe ID3D11DepthStencilState* _pDepthStencilState;
         private int _vertexBufferSize;
         private int _indexBufferSize;
-
+        private bool _backupState;
         private static unsafe readonly byte* CSTR_POSITION = (byte*)SilkMarshal.StringToPtr("POSITION");
         private static unsafe readonly byte* CSTR_TEXCOORD = (byte*)SilkMarshal.StringToPtr("TEXCOORD");
         private static unsafe readonly byte* CSTR_COLOR = (byte*)SilkMarshal.StringToPtr("COLOR");
@@ -225,8 +224,16 @@ namespace ImGuiBackends.Direct3D11
                         }
                         else
                         {
-                            // todo, might be able to cast this...? quite dangerous though.
+#if NET6_0
+                            // typedef void (*ImDrawCallback)(const ImDrawList* parent_list, const ImDrawCmd* cmd);
+                            delegate*<ImDrawList*, ImDrawCmd*, void> imDrawCallback = (delegate*<ImDrawList*, ImDrawCmd*, void>)cmdPtr.UserCallback;
+                            if (imDrawCallback != null)
+                            {
+                                imDrawCallback(cmdList, cmdPtr);
+                            }
+#else
                             throw new NotImplementedException();
+#endif
                         }
                     }
                     else
@@ -251,14 +258,26 @@ namespace ImGuiBackends.Direct3D11
                 globalIdxOffset += cmdList.IdxBuffer.Size;
                 globalVtxOffset += cmdList.VtxBuffer.Size;
             }
-            this.RestoreState(backup);
+            this.RestoreState(&backup);
 
             // backup disposed here.
         }
 
-        private unsafe void RestoreState(in D3D11StateBackup backup)
+        /// <summary>
+        /// Restore DX11 Device State.
+        /// 
+        /// If <see cref="_backupState"/> is false, this method does nothing.
+        /// </summary>
+        /// <param name="_backup">A pointer to a stack-allocated <see cref="D3D11StateBackup"/> instance.</param>
+        private unsafe void RestoreState(D3D11StateBackup* _backup)
         {
+            if (!_backupState)
+                return;
+
             ID3D11DeviceContext* deviceContext = _deviceContext;
+
+            ref readonly D3D11StateBackup backup = ref *_backup;
+
             deviceContext->IASetInputLayout(backup.InputLayout);
             deviceContext->IASetIndexBuffer(backup.IndexBuffer, backup.IndexBufferFormat, backup.IndexBufferOffset);
             deviceContext->IASetPrimitiveTopology(backup.PrimitiveTopology);
@@ -271,12 +290,9 @@ namespace ImGuiBackends.Direct3D11
             deviceContext->RSSetViewports(backup.ViewportsCount, backup.Viewports);
             
             // -- OM
-            fixed (float* blendFlactor = backup.BlendFactor)
-            {
-                deviceContext->OMSetBlendState(backup.BlendState, blendFlactor, backup.SampleMask);
-                deviceContext->OMSetDepthStencilState(backup.DepthStencilState, backup.DepthStencilRef);
-                deviceContext->OMSetRenderTargets((uint)backup.RenderTargetViews.Length, backup.RenderTargetViews, backup.DepthStencilView);
-            }
+            deviceContext->OMSetBlendState(backup.BlendState, _backup->BlendFactor, backup.SampleMask);
+            deviceContext->OMSetDepthStencilState(backup.DepthStencilState, backup.DepthStencilRef);
+            deviceContext->OMSetRenderTargets((uint)backup.RenderTargetViews.Length, backup.RenderTargetViews, backup.DepthStencilView);
 
             // -- VS
             deviceContext->VSSetShader(backup.VS, backup.VSBackup.Instances, backup.VSBackup.InstancesCount);
@@ -320,7 +336,6 @@ namespace ImGuiBackends.Direct3D11
                 uavInitialCounts[i] = unchecked((uint)-1);
 
             deviceContext->CSSetUnorderedAccessViews(0, (uint)backup.CSUAVs.Length, backup.CSUAVs, uavInitialCounts);
-
         }
 
         public unsafe void InvalidateDeviceObjects()
@@ -465,17 +480,17 @@ namespace ImGuiBackends.Direct3D11
             return true;
         }
 
-        public unsafe void Init(IntPtr device, IntPtr deviceContext)
+        public unsafe void Init(IntPtr device, IntPtr deviceContext, bool backupState = true)
         {
-            this.Init((ID3D11Device*)device.ToPointer(), (ID3D11DeviceContext*)deviceContext.ToPointer());
+            this.Init((ID3D11Device*)device.ToPointer(), (ID3D11DeviceContext*)deviceContext.ToPointer(), backupState);
         }
 
-        // maybe pointers? idk
-        public unsafe void Init(ID3D11Device* device, ID3D11DeviceContext* deviceContext)
+        public unsafe void Init(ID3D11Device* device, ID3D11DeviceContext* deviceContext, bool backupState = true)
         {
-            // uh... not sure if this will work but maybe.
             var io = ImGui.GetIO();
-            io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;  // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
+            io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasViewports;  // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
+
+            this._backupState = backupState;
 
             IDXGIDevice* pDXGIDevice = null;
             IDXGIAdapter* pDXGIAdapter = null;
@@ -502,10 +517,13 @@ namespace ImGuiBackends.Direct3D11
             if (pDXGIAdapter != null) pDXGIAdapter->Release();
             _pd3dDevice->AddRef();
             _deviceContext->AddRef();
+
+            if (io.ConfigFlags.HasFlag(ImGuiConfigFlags.ViewportsEnable)) this.InitPlatformInterface();
         }
 
         public unsafe void Shutdown()
         {
+            this.ShutdownPlatformInterface();
             this.InvalidateDeviceObjects();
             if (_pFactory != null) _pFactory->Release();
             if (_pd3dDevice != null) _pd3dDevice->Release();
@@ -518,7 +536,7 @@ namespace ImGuiBackends.Direct3D11
                 this.CreateDeviceObjects();
         }
 
-        #region Internal
+#region Internal
         private unsafe void CreateFontsTexture()
         {
             var io = ImGui.GetIO();
@@ -574,7 +592,6 @@ namespace ImGuiBackends.Direct3D11
                 io.Fonts.ClearTexData();
             }
 
-
             // Create texture sampler
             {
                 SamplerDesc desc = new()
@@ -595,10 +612,20 @@ namespace ImGuiBackends.Direct3D11
 
         // Full state save ported from 
         // https://github.com/ff-meli/ImGuiScene/blob/master/ImGuiScene/ImGui_Impl/Renderers/ImGui_Impl_DX11.cs
+        /// <summary>
+        /// Saves the D3D11 Device State.
+        /// 
+        /// If <see cref="_backupState"/> is false, the contents of the returned value is undefined. 
+        /// The returned struct itself must be disposed.
+        /// </summary>
+        /// <returns>A backup of the D3D11 Device State. The value must be disposed after use.</returns>
         private unsafe D3D11StateBackup StateBackup()
         {
             D3D11StateBackup backup = new();
             ID3D11DeviceContext* deviceContext = _deviceContext;
+
+            if (_backupState)
+                return backup;
 
             // Could clean up but we need this in order to pass ref struct
             // https://github.com/dotnet/csharplang/issues/1792
@@ -634,11 +661,6 @@ namespace ImGuiBackends.Direct3D11
             deviceContext->OMGetBlendState(&backup.BlendState, backup.BlendFactor, &backup.SampleMask);
             deviceContext->OMGetDepthStencilState(&backup.DepthStencilState, &backup.DepthStencilRef);
             deviceContext->OMGetRenderTargets(D3D11.SimultaneousRenderTargetCount, backup.RenderTargetViews, &backup.DepthStencilView);
-
-            //fixed (ID3D11RenderTargetView** renderTargetViews = backup.RenderTargetViews) 
-            //{
-            //    deviceContext->OMGetRenderTargets(D3D11.SimultaneousRenderTargetCount, renderTargetViews, &backup.DepthStencilView);
-            //}
 
             // -- VS
             // Allocate
@@ -696,6 +718,6 @@ namespace ImGuiBackends.Direct3D11
 
             return backup;
         }
-        #endregion
+#endregion
     }
 }

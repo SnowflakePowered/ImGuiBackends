@@ -22,7 +22,8 @@ namespace ImGuiBackends.Direct3D11
 
         public void Dispose()
         {
-            Marshal.FreeHGlobal((IntPtr)arrayPtr);
+            if (arrayPtr != (void*)0)
+                Marshal.FreeHGlobal((IntPtr)arrayPtr);
         }
 
         public NativeArrayEnumerator GetEnumerator() => new(in this);
@@ -31,9 +32,12 @@ namespace ImGuiBackends.Direct3D11
         {
             private readonly NativeArray<nint> backingArray;
             public static implicit operator T**(PointerArray array) => (T**)array.backingArray.arrayPtr;
-            public int Length => this.backingArray.Length;
+
+            public readonly int Length;
             public PointerArray(int length)
             {
+                // Making a copy is an extra 4 bytes but much faster on frequent access.
+                this.Length = length;
                 this.backingArray = new(length, true);
             }
 

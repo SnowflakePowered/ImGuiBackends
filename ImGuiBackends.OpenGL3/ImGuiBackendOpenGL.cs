@@ -144,8 +144,16 @@ namespace ImGuiBackends.OpenGL3
                         }
                         else
                         {
-                            // todo, might be able to cast this...? quite dangerous though.
+#if NET6_0
+                            // typedef void (*ImDrawCallback)(const ImDrawList* parent_list, const ImDrawCmd* cmd);
+                            delegate*<ImDrawList*, ImDrawCmd*, void> imDrawCallback = (delegate*<ImDrawList*, ImDrawCmd*, void>)cmdPtr.UserCallback;
+                            if (imDrawCallback != null)
+                            {
+                                imDrawCallback(cmdList, cmdPtr);
+                            }
+#else
                             throw new NotImplementedException();
+#endif
                         }
                     }
                     else
