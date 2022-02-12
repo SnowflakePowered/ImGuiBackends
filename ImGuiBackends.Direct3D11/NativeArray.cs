@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace ImGuiBackends.Direct3D11
 {
@@ -9,9 +10,13 @@ namespace ImGuiBackends.Direct3D11
 
         public static implicit operator T* (NativeArray<T> array) => array.arrayPtr;
 
-        public NativeArray(int length)
+        public NativeArray(int length, bool init = true)
         {
             arrayPtr = (T*)Marshal.AllocHGlobal(sizeof(T) * length);
+            if (init)
+            {
+                Unsafe.InitBlockUnaligned(arrayPtr, 0, (uint)(sizeof(T) * length));
+            }
             this.Length = length;
         }
 
@@ -29,7 +34,7 @@ namespace ImGuiBackends.Direct3D11
             public int Length => this.backingArray.Length;
             public PointerArray(int length)
             {
-                this.backingArray = new(length);
+                this.backingArray = new(length, true);
             }
 
             public void Dispose()

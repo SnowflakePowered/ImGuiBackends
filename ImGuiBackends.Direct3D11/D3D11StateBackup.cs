@@ -156,20 +156,20 @@ namespace ImGuiBackends.Direct3D11
     /// </summary>
     internal unsafe ref struct D3D11ShaderStageBackup
     {
-        public ID3D11Buffer*[] ConstantBuffers;
-        public ID3D11SamplerState*[] Samplers;
-        public ID3D11ShaderResourceView*[] ResourceViews;
-        public ID3D11ClassInstance*[] Instances;
+        public NativeArray<ID3D11Buffer>.PointerArray ConstantBuffers;
+        public NativeArray<ID3D11SamplerState>.PointerArray Samplers;
+        public NativeArray<ID3D11ShaderResourceView>.PointerArray ResourceViews;
+        public NativeArray<ID3D11ClassInstance>.PointerArray Instances;
         public uint InstancesCount;
 
         private bool _isDisposed = false;
 
         public D3D11ShaderStageBackup()
         {
-            this.ConstantBuffers = new ID3D11Buffer*[D3D11.CommonshaderConstantBufferApiSlotCount];
-            this.Samplers = new ID3D11SamplerState*[D3D11.CommonshaderSamplerSlotCount];
-            this.ResourceViews = new ID3D11ShaderResourceView*[D3D11.CommonshaderInputResourceSlotCount];
-            this.Instances = new ID3D11ClassInstance*[256]; // 256 is max according to PSSetShader documentation
+            this.ConstantBuffers = new(D3D11.CommonshaderConstantBufferApiSlotCount);
+            this.Samplers = new(D3D11.CommonshaderSamplerSlotCount);
+            this.ResourceViews = new(D3D11.CommonshaderInputResourceSlotCount);
+            this.Instances = new(256); // 256 is max according to PSSetShader documentation
             this.InstancesCount = 0;
         }
 
@@ -183,24 +183,28 @@ namespace ImGuiBackends.Direct3D11
                 if (buffer != null)
                     buffer->Release();
             }
+            this.ConstantBuffers.Dispose();
 
             foreach (ID3D11SamplerState* sampler in this.Samplers)
             {
                 if (sampler != null)
                     sampler->Release();
             }
+            this.Samplers.Dispose();
 
             foreach (ID3D11ShaderResourceView* resource in this.ResourceViews)
             {
                 if (resource != null)
                     resource->Release();
             }
+            this.ResourceViews.Dispose();
 
             foreach (ID3D11ClassInstance* classInstance in this.Instances)
             {
                 if (classInstance != null)
                     classInstance->Release();
             }
+            this.Instances.Dispose();
             _isDisposed = true;
         }
     }

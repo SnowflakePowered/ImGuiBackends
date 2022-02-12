@@ -78,7 +78,6 @@ namespace ImGuiBackends.Direct3D11
             _deviceContext->DSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
             _deviceContext->CSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
 
-
             // Setup blend state
             Vector4 blendFactor = new(0, 0, 0, 0);
             _deviceContext->OMSetBlendState(_pBlendState, (float*)&blendFactor, 0xffffffff);
@@ -280,83 +279,48 @@ namespace ImGuiBackends.Direct3D11
             }
 
             // -- VS
-            fixed (ID3D11ClassInstance** classInstances = backup.VSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.VSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.VSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.VSBackup.ResourceViews)
-            {
-                deviceContext->VSSetShader(backup.VS, classInstances, backup.VSBackup.InstancesCount);
-                deviceContext->VSSetSamplers(0, (uint)backup.VSBackup.Samplers.Length, samplers);
-                deviceContext->VSSetConstantBuffers(0, (uint)backup.VSBackup.ConstantBuffers.Length, constantBuffers);
-                deviceContext->VSSetShaderResources(0, (uint)backup.VSBackup.ResourceViews.Length, resourceViews);
-            }
+            deviceContext->VSSetShader(backup.VS, backup.VSBackup.Instances, backup.VSBackup.InstancesCount);
+            deviceContext->VSSetSamplers(0, (uint)backup.VSBackup.Samplers.Length, backup.VSBackup.Samplers);
+            deviceContext->VSSetConstantBuffers(0, (uint)backup.VSBackup.ConstantBuffers.Length, backup.VSBackup.ConstantBuffers);
+            deviceContext->VSSetShaderResources(0, (uint)backup.VSBackup.ResourceViews.Length, backup.VSBackup.ResourceViews);
 
             // -- HS
-            fixed (ID3D11ClassInstance** classInstances = backup.HSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.HSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.HSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.HSBackup.ResourceViews)
-            {
-                deviceContext->HSSetShader(backup.HS, classInstances, backup.HSBackup.InstancesCount);
-                deviceContext->HSSetSamplers(0, (uint)backup.HSBackup.Samplers.Length, samplers);
-                deviceContext->HSSetConstantBuffers(0, (uint)backup.HSBackup.ConstantBuffers.Length, constantBuffers);
-                deviceContext->HSSetShaderResources(0, (uint)backup.HSBackup.ResourceViews.Length, resourceViews);
-            }
+            deviceContext->HSSetShader(backup.HS, backup.HSBackup.Instances, backup.HSBackup.InstancesCount);
+            deviceContext->HSSetSamplers(0, (uint)backup.HSBackup.Samplers.Length, backup.HSBackup.Samplers);
+            deviceContext->HSSetConstantBuffers(0, (uint)backup.HSBackup.ConstantBuffers.Length, backup.HSBackup.ConstantBuffers);
+            deviceContext->HSSetShaderResources(0, (uint)backup.HSBackup.ResourceViews.Length, backup.HSBackup.ResourceViews);
 
             // -- DS
-            fixed (ID3D11ClassInstance** classInstances = backup.DSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.DSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.DSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.DSBackup.ResourceViews)
-            {
-                deviceContext->DSSetShader(backup.DS, classInstances, backup.DSBackup.InstancesCount);
-                deviceContext->DSSetSamplers(0, (uint)backup.DSBackup.Samplers.Length, samplers);
-                deviceContext->DSSetConstantBuffers(0, (uint)backup.DSBackup.ConstantBuffers.Length, constantBuffers);
-                deviceContext->DSSetShaderResources(0, (uint)backup.DSBackup.ResourceViews.Length, resourceViews);
-            }
+            deviceContext->DSSetShader(backup.DS, backup.DSBackup.Instances, backup.DSBackup.InstancesCount);
+            deviceContext->DSSetSamplers(0, (uint)backup.DSBackup.Samplers.Length, backup.DSBackup.Samplers);
+            deviceContext->DSSetConstantBuffers(0, (uint)backup.DSBackup.ConstantBuffers.Length, backup.DSBackup.ConstantBuffers);
+            deviceContext->DSSetShaderResources(0, (uint)backup.DSBackup.ResourceViews.Length, backup.DSBackup.ResourceViews);
 
             // -- GS
-            fixed (ID3D11ClassInstance** classInstances = backup.GSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.GSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.GSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.GSBackup.ResourceViews)
-            {
-                deviceContext->GSSetShader(backup.GS, classInstances, backup.GSBackup.InstancesCount);
-                deviceContext->GSSetSamplers(0, (uint)backup.GSBackup.Samplers.Length, samplers);
-                deviceContext->GSSetConstantBuffers(0, (uint)backup.GSBackup.ConstantBuffers.Length, constantBuffers);
-                deviceContext->GSSetShaderResources(0, (uint)backup.GSBackup.ResourceViews.Length, resourceViews);
-            }
+            deviceContext->GSSetShader(backup.GS, backup.GSBackup.Instances, backup.GSBackup.InstancesCount);
+            deviceContext->GSSetSamplers(0, (uint)backup.GSBackup.Samplers.Length, backup.GSBackup.Samplers);
+            deviceContext->GSSetConstantBuffers(0, (uint)backup.GSBackup.ConstantBuffers.Length, backup.GSBackup.ConstantBuffers);
+            deviceContext->GSSetShaderResources(0, (uint)backup.GSBackup.ResourceViews.Length, backup.GSBackup.ResourceViews);
 
             // -- PS
-            fixed (ID3D11ClassInstance** classInstances = backup.PSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.PSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.PSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.PSBackup.ResourceViews)
-            {
-                deviceContext->PSSetShader(backup.PS, classInstances, backup.PSBackup.InstancesCount);
-                deviceContext->PSSetSamplers(0, (uint)backup.PSBackup.Samplers.Length, samplers);
-                deviceContext->PSSetConstantBuffers(0, (uint)backup.PSBackup.ConstantBuffers.Length, constantBuffers);
-                deviceContext->PSSetShaderResources(0, (uint)backup.PSBackup.ResourceViews.Length, resourceViews);
-            }
+            deviceContext->PSSetShader(backup.PS, backup.PSBackup.Instances, backup.PSBackup.InstancesCount);
+            deviceContext->PSSetSamplers(0, (uint)backup.PSBackup.Samplers.Length, backup.PSBackup.Samplers);
+            deviceContext->PSSetConstantBuffers(0, (uint)backup.PSBackup.ConstantBuffers.Length, backup.PSBackup.ConstantBuffers);
+            deviceContext->PSSetShaderResources(0, (uint)backup.PSBackup.ResourceViews.Length, backup.PSBackup.ResourceViews);
 
             // -- CS
-            fixed (ID3D11ClassInstance** classInstances = backup.CSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.CSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.CSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.CSBackup.ResourceViews)
-            {
-                deviceContext->CSSetShader(backup.CS, classInstances, backup.CSBackup.InstancesCount);
-                deviceContext->CSSetSamplers(0, (uint)backup.CSBackup.Samplers.Length, samplers);
-                deviceContext->CSSetConstantBuffers(0, (uint)backup.CSBackup.ConstantBuffers.Length, constantBuffers);
-                deviceContext->CSSetShaderResources(0, (uint)backup.CSBackup.ResourceViews.Length, resourceViews);
+            deviceContext->CSSetShader(backup.CS, backup.CSBackup.Instances, backup.CSBackup.InstancesCount);
+            deviceContext->CSSetSamplers(0, (uint)backup.CSBackup.Samplers.Length, backup.CSBackup.Samplers);
+            deviceContext->CSSetConstantBuffers(0, (uint)backup.CSBackup.ConstantBuffers.Length, backup.CSBackup.ConstantBuffers);
+            deviceContext->CSSetShaderResources(0, (uint)backup.CSBackup.ResourceViews.Length, backup.CSBackup.ResourceViews);
 
-                // CSUAVs are never very big, shouldn't worry about overflow here.
-                uint* uavInitialCounts = stackalloc uint[backup.CSUAVs.Length];
-                for (int i = 0; i < backup.CSUAVs.Length; i++)
-                    uavInitialCounts[i] = unchecked((uint)-1);
+            // CSUAVs are never very big, shouldn't worry about overflow here.
+            uint* uavInitialCounts = stackalloc uint[backup.CSUAVs.Length];
+            for (int i = 0; i < backup.CSUAVs.Length; i++)
+                uavInitialCounts[i] = unchecked((uint)-1);
 
-                deviceContext->CSSetUnorderedAccessViews(0, (uint)backup.CSUAVs.Length, backup.CSUAVs, uavInitialCounts);
-            }
+            deviceContext->CSSetUnorderedAccessViews(0, (uint)backup.CSUAVs.Length, backup.CSUAVs, uavInitialCounts);
+
         }
 
         public unsafe void InvalidateDeviceObjects()
@@ -663,13 +627,6 @@ namespace ImGuiBackends.Direct3D11
             deviceContext->RSGetScissorRects(&backup.ScissorRectsCount, backup.ScissorRects);
             deviceContext->RSGetViewports(&backup.ViewportsCount, backup.Viewports);
 
-            //fixed (Rectangle<int>* scissorRects = backup.ScissorRects)
-            //fixed (Viewport* viewports = backup.Viewports)
-            //{
-            //    deviceContext->RSGetScissorRects(&backup.ScissorRectsCount, scissorRects);
-            //    deviceContext->RSGetViewports(&backup.ViewportsCount, viewports);
-            //}
-
             // -- OM
             // Allocate
             backup.RenderTargetViews = new(D3D11.SimultaneousRenderTargetCount);
@@ -686,94 +643,57 @@ namespace ImGuiBackends.Direct3D11
             // -- VS
             // Allocate
             backup.VSBackup = new();
-
-            fixed (ID3D11ClassInstance** classInstances = backup.VSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.VSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.VSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.VSBackup.ResourceViews)
-            {
-                deviceContext->VSGetShader(&backup.VS, classInstances, &backup.VSBackup.InstancesCount);
-                deviceContext->VSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, samplers);
-                deviceContext->VSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, constantBuffers);
-                deviceContext->VSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, resourceViews);
-            }
-
+            deviceContext->VSGetShader(&backup.VS, backup.VSBackup.Instances, &backup.VSBackup.InstancesCount);
+            deviceContext->VSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, backup.VSBackup.Samplers);
+            deviceContext->VSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, backup.VSBackup.ConstantBuffers);
+            deviceContext->VSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, backup.VSBackup.ResourceViews);
 
             // -- HS
             // Allocate
             backup.HSBackup = new();
 
-            fixed (ID3D11ClassInstance** classInstances = backup.HSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.HSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.HSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.HSBackup.ResourceViews)
-            {
-                deviceContext->HSGetShader(&backup.HS, classInstances, &backup.HSBackup.InstancesCount);
-                deviceContext->HSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, samplers);
-                deviceContext->HSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, constantBuffers);
-                deviceContext->HSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, resourceViews);
-            }
+            deviceContext->HSGetShader(&backup.HS, backup.HSBackup.Instances, &backup.HSBackup.InstancesCount);
+            deviceContext->HSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, backup.HSBackup.Samplers);
+            deviceContext->HSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, backup.HSBackup.ConstantBuffers);
+            deviceContext->HSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, backup.HSBackup.ResourceViews);
 
             // -- DS
             // Allocate
             backup.DSBackup = new();
 
-            fixed (ID3D11ClassInstance** classInstances = backup.DSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.DSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.DSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.DSBackup.ResourceViews)
-            {
-                deviceContext->DSGetShader(&backup.DS, classInstances, &backup.DSBackup.InstancesCount);
-                deviceContext->DSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, samplers);
-                deviceContext->DSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, constantBuffers);
-                deviceContext->DSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, resourceViews);
-            }
+            deviceContext->DSGetShader(&backup.DS, backup.DSBackup.Instances, &backup.DSBackup.InstancesCount);
+            deviceContext->DSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, backup.DSBackup.Samplers);
+            deviceContext->DSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, backup.DSBackup.ConstantBuffers);
+            deviceContext->DSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, backup.DSBackup.ResourceViews);
 
             // -- GS
             // Allocate
             backup.GSBackup = new();
 
-            fixed (ID3D11ClassInstance** classInstances = backup.GSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.GSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.GSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.GSBackup.ResourceViews)
-            {
-                deviceContext->GSGetShader(&backup.GS, classInstances, &backup.GSBackup.InstancesCount);
-                deviceContext->GSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, samplers);
-                deviceContext->GSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, constantBuffers);
-                deviceContext->GSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, resourceViews);
-            }
+            deviceContext->GSGetShader(&backup.GS, backup.GSBackup.Instances, &backup.GSBackup.InstancesCount);
+            deviceContext->GSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, backup.GSBackup.Samplers);
+            deviceContext->GSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, backup.GSBackup.ConstantBuffers);
+            deviceContext->GSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, backup.GSBackup.ResourceViews);
 
             // -- PS
             // Allocate
             backup.PSBackup = new();
-            fixed (ID3D11ClassInstance** classInstances = backup.PSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.PSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.PSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.PSBackup.ResourceViews)
-            {
-                deviceContext->PSGetShader(&backup.PS, classInstances, &backup.PSBackup.InstancesCount);
-                deviceContext->PSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, samplers);
-                deviceContext->PSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, constantBuffers);
-                deviceContext->PSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, resourceViews);
-            }
+            deviceContext->PSGetShader(&backup.PS, backup.PSBackup.Instances, &backup.PSBackup.InstancesCount);
+            deviceContext->PSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, backup.PSBackup.Samplers);
+            deviceContext->PSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, backup.PSBackup.ConstantBuffers);
+            deviceContext->PSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, backup.PSBackup.ResourceViews);
 
             // -- CS
             // Allocate
             backup.CSBackup = new();
             backup.CSUAVs = new(D3D11.D3D111UavSlotCount);
 
-            fixed (ID3D11ClassInstance** classInstances = backup.CSBackup.Instances)
-            fixed (ID3D11SamplerState** samplers = backup.CSBackup.Samplers)
-            fixed (ID3D11Buffer** constantBuffers = backup.CSBackup.ConstantBuffers)
-            fixed (ID3D11ShaderResourceView** resourceViews = backup.CSBackup.ResourceViews)
-            {
-                deviceContext->CSGetShader(&backup.CS, classInstances, &backup.CSBackup.InstancesCount);
-                deviceContext->CSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, samplers);
-                deviceContext->CSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, constantBuffers);
-                deviceContext->CSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, resourceViews);
-                deviceContext->CSGetUnorderedAccessViews(0, D3D11.D3D111UavSlotCount, backup.CSUAVs);
-            }
+            deviceContext->CSGetShader(&backup.CS, backup.CSBackup.Instances, &backup.CSBackup.InstancesCount);
+            deviceContext->CSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, backup.CSBackup.Samplers);
+            deviceContext->CSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, backup.CSBackup.ConstantBuffers);
+            deviceContext->CSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, backup.CSBackup.ResourceViews);
+            deviceContext->CSGetUnorderedAccessViews(0, D3D11.D3D111UavSlotCount, backup.CSUAVs);
+
             return backup;
         }
         #endregion
