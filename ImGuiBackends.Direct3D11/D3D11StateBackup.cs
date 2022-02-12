@@ -42,7 +42,7 @@ namespace ImGuiBackends.Direct3D11
         public ID3D11DepthStencilState* DepthStencilState;
         public uint DepthStencilRef;
         public ID3D11DepthStencilView* DepthStencilView;
-        public ID3D11RenderTargetView*[] RenderTargetViews;
+        public NativeArray<ID3D11RenderTargetView>.PointerArray RenderTargetViews;
 
         // VS
         public ID3D11VertexShader* VS;
@@ -66,7 +66,7 @@ namespace ImGuiBackends.Direct3D11
 
         // CS
         public ID3D11ComputeShader* CS;
-        public ID3D11UnorderedAccessView*[] CSUAVs;
+        public NativeArray<ID3D11UnorderedAccessView>.PointerArray CSUAVs;
         public D3D11ShaderStageBackup CSBackup;
 
         public void Dispose()
@@ -106,6 +106,8 @@ namespace ImGuiBackends.Direct3D11
                     rtv->Release();
             }
 
+            this.RenderTargetViews.Dispose();
+
             // VS
             if (this.VS != null)
                 this.VS->Release();
@@ -140,9 +142,11 @@ namespace ImGuiBackends.Direct3D11
                 if (uav != null)
                     uav->Release();
             }
+            this.CSUAVs.Dispose();
 
             this.ScissorRects.Dispose();
             this.Viewports.Dispose();
+            
             _isDisposed = true;
         }
     }

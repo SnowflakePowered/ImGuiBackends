@@ -273,11 +273,10 @@ namespace ImGuiBackends.Direct3D11
             
             // -- OM
             fixed (float* blendFlactor = backup.BlendFactor)
-            fixed (ID3D11RenderTargetView** renderTargetViews = backup.RenderTargetViews)
             {
                 deviceContext->OMSetBlendState(backup.BlendState, blendFlactor, backup.SampleMask);
                 deviceContext->OMSetDepthStencilState(backup.DepthStencilState, backup.DepthStencilRef);
-                deviceContext->OMSetRenderTargets((uint)backup.RenderTargetViews.Length, renderTargetViews, backup.DepthStencilView);
+                deviceContext->OMSetRenderTargets((uint)backup.RenderTargetViews.Length, backup.RenderTargetViews, backup.DepthStencilView);
             }
 
             // -- VS
@@ -345,7 +344,6 @@ namespace ImGuiBackends.Direct3D11
             fixed (ID3D11SamplerState** samplers = backup.CSBackup.Samplers)
             fixed (ID3D11Buffer** constantBuffers = backup.CSBackup.ConstantBuffers)
             fixed (ID3D11ShaderResourceView** resourceViews = backup.CSBackup.ResourceViews)
-            fixed (ID3D11UnorderedAccessView** unorderedAccessViews = backup.CSUAVs)
             {
                 deviceContext->CSSetShader(backup.CS, classInstances, backup.CSBackup.InstancesCount);
                 deviceContext->CSSetSamplers(0, (uint)backup.CSBackup.Samplers.Length, samplers);
@@ -357,7 +355,7 @@ namespace ImGuiBackends.Direct3D11
                 for (int i = 0; i < backup.CSUAVs.Length; i++)
                     uavInitialCounts[i] = unchecked((uint)-1);
 
-                deviceContext->CSSetUnorderedAccessViews(0, (uint)backup.CSUAVs.Length, unorderedAccessViews, uavInitialCounts);
+                deviceContext->CSSetUnorderedAccessViews(0, (uint)backup.CSUAVs.Length, backup.CSUAVs, uavInitialCounts);
             }
         }
 
@@ -674,15 +672,16 @@ namespace ImGuiBackends.Direct3D11
 
             // -- OM
             // Allocate
-            backup.RenderTargetViews = new ID3D11RenderTargetView*[D3D11.SimultaneousRenderTargetCount];
+            backup.RenderTargetViews = new(D3D11.SimultaneousRenderTargetCount);
 
             deviceContext->OMGetBlendState(&backup.BlendState, backup.BlendFactor, &backup.SampleMask);
             deviceContext->OMGetDepthStencilState(&backup.DepthStencilState, &backup.DepthStencilRef);
+            deviceContext->OMGetRenderTargets(D3D11.SimultaneousRenderTargetCount, backup.RenderTargetViews, &backup.DepthStencilView);
 
-            fixed (ID3D11RenderTargetView** renderTargetViews = backup.RenderTargetViews) 
-            {
-                deviceContext->OMGetRenderTargets(D3D11.SimultaneousRenderTargetCount, renderTargetViews, &backup.DepthStencilView);
-            }
+            //fixed (ID3D11RenderTargetView** renderTargetViews = backup.RenderTargetViews) 
+            //{
+            //    deviceContext->OMGetRenderTargets(D3D11.SimultaneousRenderTargetCount, renderTargetViews, &backup.DepthStencilView);
+            //}
 
             // -- VS
             // Allocate
@@ -762,19 +761,18 @@ namespace ImGuiBackends.Direct3D11
             // -- CS
             // Allocate
             backup.CSBackup = new();
-            backup.CSUAVs = new ID3D11UnorderedAccessView*[D3D11.D3D111UavSlotCount];
+            backup.CSUAVs = new(D3D11.D3D111UavSlotCount);
 
             fixed (ID3D11ClassInstance** classInstances = backup.CSBackup.Instances)
             fixed (ID3D11SamplerState** samplers = backup.CSBackup.Samplers)
             fixed (ID3D11Buffer** constantBuffers = backup.CSBackup.ConstantBuffers)
             fixed (ID3D11ShaderResourceView** resourceViews = backup.CSBackup.ResourceViews)
-            fixed (ID3D11UnorderedAccessView** unorderedAccessViews = backup.CSUAVs)
             {
                 deviceContext->CSGetShader(&backup.CS, classInstances, &backup.CSBackup.InstancesCount);
                 deviceContext->CSGetSamplers(0, D3D11.CommonshaderSamplerSlotCount, samplers);
                 deviceContext->CSGetConstantBuffers(0, D3D11.CommonshaderConstantBufferApiSlotCount, constantBuffers);
                 deviceContext->CSGetShaderResources(0, D3D11.CommonshaderInputResourceSlotCount, resourceViews);
-                deviceContext->CSGetUnorderedAccessViews(0, D3D11.D3D111UavSlotCount, unorderedAccessViews);
+                deviceContext->CSGetUnorderedAccessViews(0, D3D11.D3D111UavSlotCount, backup.CSUAVs);
             }
             return backup;
         }
