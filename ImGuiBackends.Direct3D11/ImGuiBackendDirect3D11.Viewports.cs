@@ -19,39 +19,30 @@ namespace ImGuiBackends.Direct3D11
         {
             public IDXGISwapChain* SwapChain;
             public ID3D11RenderTargetView* RTView;
+            public ID3D11Device* Device;
+            public ID3D11DeviceContext* DeviceContext;
+            public delegate* unmanaged<ImDrawDataPtr, void> RenderDelegate;
         }
 
         private delegate void CreateWindowDelegate(ImGuiViewportPtr ptr);
-        private delegate void DestroyWindowDelegate(ImGuiViewportPtr ptr);
-        private delegate void SetWindowSizeDelegate(ImGuiViewportPtr ptr, Vector2 size);
-        private delegate void RenderWindowDelegate(ImGuiViewportPtr ptr, IntPtr v);
-        private delegate void SwapBuffersDelegate(ImGuiViewportPtr ptr, IntPtr v);
-
         // Pin delegates to GC
         private CreateWindowDelegate? _createWindow;
-        private DestroyWindowDelegate? _destroyWindow;
-        private SetWindowSizeDelegate? _setWindowSize;
-        private RenderWindowDelegate? _renderWindow;
-        private SwapBuffersDelegate? _swapBuffers;
-
         private void InitPlatformInterface()
         {
             ImGuiPlatformIOPtr io = ImGui.GetPlatformIO();
 
             _createWindow = CreateWindow;
-            _destroyWindow = DestroyWindow;
-            _setWindowSize = SetWindowSize;
-            _renderWindow = RenderWindow;
-            _swapBuffers = SwapBuffers;
 
-            // what if we make a vtable so we can use function pointers instead..?
-            io.Renderer_CreateWindow = Marshal.GetFunctionPointerForDelegate(_createWindow);
-            io.Renderer_DestroyWindow = Marshal.GetFunctionPointerForDelegate(_destroyWindow);
-            io.Renderer_SetWindowSize = Marshal.GetFunctionPointerForDelegate(_setWindowSize);
-            io.Renderer_RenderWindow = Marshal.GetFunctionPointerForDelegate(_renderWindow);
-            io.Renderer_SwapBuffers = Marshal.GetFunctionPointerForDelegate(_swapBuffers);
+            unsafe
+            {
+                // what if we make a vtable so we can use function pointers instead..?
+                io.Renderer_CreateWindow = Marshal.GetFunctionPointerForDelegate(_createWindow);
+                io.Renderer_DestroyWindow = (nint)(delegate* unmanaged<ImGuiViewportPtr, void>)&ImGuiBackendDirect3D11.DestroyWindow;
+                io.Renderer_SetWindowSize = (nint)(delegate* unmanaged<ImGuiViewportPtr, Vector2, void>)&ImGuiBackendDirect3D11.SetWindowSize;
+                io.Renderer_RenderWindow = (nint)(delegate* unmanaged<ImGuiViewportPtr, IntPtr, void>)&ImGuiBackendDirect3D11.RenderWindow;
+                io.Renderer_SwapBuffers = (nint)(delegate* unmanaged<ImGuiViewportPtr, IntPtr, void>)&ImGuiBackendDirect3D11.SwapBuffers;
+            }
         }
-
         private unsafe void CreateWindow(ImGuiViewportPtr viewport)
         {
             var vd = (ViewportData*)Marshal.AllocHGlobal(Marshal.SizeOf<ViewportData>());
@@ -80,6 +71,18 @@ namespace ImGuiBackends.Direct3D11
                 Flags = 0
             };
 
+            if (vd->Device == null)
+            {
+                vd->Device = _device;
+                vd->Device->AddRef();
+            }
+
+            if (vd->DeviceContext == null)
+            {
+                vd->DeviceContext = _deviceContext;
+                vd->DeviceContext->AddRef();
+            }
+
             _factory->CreateSwapChain((IUnknown*)_device, &desc, &vd->SwapChain);
 
             if (vd->SwapChain != null)
@@ -87,34 +90,58 @@ namespace ImGuiBackends.Direct3D11
                 ID3D11Texture2D* pBackBuffer = null;
                 Guid tex2DRiid = ID3D11Texture2D.Guid;
                 vd->SwapChain->GetBuffer(0, &tex2DRiid, (void**)&pBackBuffer);
-                _device->CreateRenderTargetView((ID3D11Resource*)pBackBuffer, null, &vd->RTView);
+                vd->Device->CreateRenderTargetView((ID3D11Resource*)pBackBuffer, null, &vd->RTView);
                 pBackBuffer->Release();
+            }
+
+            if (vd->RenderDelegate == null)
+            {
+                vd->RenderDelegate = (delegate* unmanaged<ImDrawDataPtr, void>)Marshal.GetFunctionPointerForDelegate(this.RenderDrawData);
             }
         }
 
-        private unsafe void DestroyWindow(ImGuiViewportPtr viewport)
+        [UnmanagedCallersOnly]
+        private static unsafe void DestroyWindow(ImGuiViewportPtr viewport)
         {
             // The main viewport (owned by the application) will always have RendererUserData == NULL since we didn't create the data for it.
-            ViewportData* viewportData = (ViewportData*)viewport.RendererUserData.ToPointer();
-            if (viewportData == null)
+            ViewportData* vd = (ViewportData*)viewport.RendererUserData.ToPointer();
+            if (vd == null)
                 return;
 
-            if (viewportData->SwapChain != null)
+            if (vd->SwapChain != null)
             {
-                viewportData->SwapChain->Release();
-                viewportData->SwapChain = null;
+                vd->SwapChain->Release();
+                vd->SwapChain = null;
             }
 
-            if (viewportData->RTView != null)
+            if (vd->RTView != null)
             {
-                viewportData->RTView->Release();
-                viewportData->RTView = null;
+                vd->RTView->Release();
+                vd->RTView = null;
+            }
+
+            if (vd->Device != null)
+            {
+                vd->Device->Release();
+                vd->Device = null;
+            }
+
+            if (vd->DeviceContext != null)
+            {
+                vd->DeviceContext->Release();
+                vd->DeviceContext = null;
+            }
+
+            if (vd->RenderDelegate != null)
+            {
+                vd->RenderDelegate = null;
             }
 
             viewport.RendererUserData = IntPtr.Zero;
         }
 
-        public unsafe void SetWindowSize(ImGuiViewportPtr viewport, Vector2 size)
+        [UnmanagedCallersOnly]
+        private static unsafe void SetWindowSize(ImGuiViewportPtr viewport, Vector2 size)
         {
             ViewportData* viewportData = (ViewportData*)viewport.RendererUserData.ToPointer();
             if (viewportData == null)
@@ -137,25 +164,29 @@ namespace ImGuiBackends.Direct3D11
                     CheckDxError(-1, "DX11 SetWindowSize() failed creating buffers.");
                     return;
                 }
-                _device->CreateRenderTargetView((ID3D11Resource*)pBackBuffer, null, &viewportData->RTView);
+                viewportData->Device->CreateRenderTargetView((ID3D11Resource*)pBackBuffer, null, &viewportData->RTView);
                 pBackBuffer->Release();
             }
         }
 
-        public unsafe void RenderWindow(ImGuiViewportPtr viewport, IntPtr v)
+        [UnmanagedCallersOnly]
+        private static unsafe void RenderWindow(ImGuiViewportPtr viewport, IntPtr v)
         {
             ViewportData* viewportData = (ViewportData*)viewport.RendererUserData.ToPointer();
             if (viewportData == null)
                 return;
             Vector4 clearColor = new(0, 0, 0, 1);
 
-            _deviceContext->OMSetRenderTargets(1, &viewportData->RTView, null);
+            viewportData->DeviceContext->OMSetRenderTargets(1, &viewportData->RTView, null);
             if (!(viewport.Flags.HasFlag(ImGuiViewportFlags.NoRendererClear)))
-                _deviceContext->ClearRenderTargetView(viewportData->RTView, (float*)&clearColor);
-            this.RenderDrawData(viewport.DrawData);
+                viewportData->DeviceContext->ClearRenderTargetView(viewportData->RTView, (float*)&clearColor);
+
+            if (viewportData->RenderDelegate != null)
+                viewportData->RenderDelegate(viewport.DrawData);
         }
 
-        public unsafe void SwapBuffers(ImGuiViewportPtr viewport, IntPtr v)
+        [UnmanagedCallersOnly]
+        private static unsafe void SwapBuffers(ImGuiViewportPtr viewport, IntPtr v)
         {
             ViewportData* viewportData = (ViewportData*)viewport.RendererUserData.ToPointer();
             if (viewportData == null)
