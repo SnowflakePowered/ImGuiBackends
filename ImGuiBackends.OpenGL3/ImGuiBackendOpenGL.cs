@@ -107,14 +107,14 @@ namespace ImGuiBackends.OpenGL3
             // Render command lists
             for (int n = 0; n < drawDataPtr.CmdListsCount; n++)
             {
-                ImDrawListPtr cmdListPtr = drawDataPtr.CmdListsRange[n];
+                ImDrawListPtr cmdList = drawDataPtr.CmdListsRange[n];
 
                 // Upload vertex/index buffers
 
                 // patch: https://github.com/ocornut/imgui/commit/389982eb5afbb9f93873d87f1201842ccbc82dec#diff-518fceee829a7e5d6551f48feb3080c081c00b4a153b9ee07905c58f8a854136R431
 
-                nuint vtxBufferSize = unchecked((nuint)(cmdListPtr.VtxBuffer.Size * sizeof(ImDrawVert)));
-                nuint idxBufferSize = unchecked((nuint)(cmdListPtr.IdxBuffer.Size * sizeof(ushort))); // sizeof(ushort) == ImDrawIdx
+                nuint vtxBufferSize = unchecked((nuint)(cmdList.VtxBuffer.Size * sizeof(ImDrawVert)));
+                nuint idxBufferSize = unchecked((nuint)(cmdList.IdxBuffer.Size * sizeof(ushort))); // sizeof(ushort) == ImDrawIdx
 
                 if (_vertexBufferSize < vtxBufferSize)
                 {
@@ -127,14 +127,14 @@ namespace ImGuiBackends.OpenGL3
                     _gl.BufferData(GLEnum.ElementArrayBuffer, _indexBufferSize, null, GLEnum.StreamDraw);
                 }
 
-                _gl.BufferSubData(GLEnum.ArrayBuffer, 0, vtxBufferSize, cmdListPtr.VtxBuffer.Data.ToPointer());
+                _gl.BufferSubData(GLEnum.ArrayBuffer, 0, vtxBufferSize, cmdList.VtxBuffer.Data.ToPointer());
                 _gl.CheckGlError($"Data Vert {n}");
-                _gl.BufferSubData(GLEnum.ElementArrayBuffer, 0, idxBufferSize, cmdListPtr.IdxBuffer.Data.ToPointer());
+                _gl.BufferSubData(GLEnum.ElementArrayBuffer, 0, idxBufferSize, cmdList.IdxBuffer.Data.ToPointer());
                 _gl.CheckGlError($"Data Idx {n}");
 
-                for (int cmd_i = 0; cmd_i < cmdListPtr.CmdBuffer.Size; cmd_i++)
+                for (int cmd_i = 0; cmd_i < cmdList.CmdBuffer.Size; cmd_i++)
                 {
-                    ImDrawCmdPtr cmdPtr = cmdListPtr.CmdBuffer[cmd_i];
+                    ImDrawCmdPtr cmdPtr = cmdList.CmdBuffer[cmd_i];
 
                     if (cmdPtr.UserCallback != IntPtr.Zero)
                     {
@@ -144,16 +144,12 @@ namespace ImGuiBackends.OpenGL3
                         }
                         else
                         {
-#if NET6_0
                             // typedef void (*ImDrawCallback)(const ImDrawList* parent_list, const ImDrawCmd* cmd);
-                            delegate*<ImDrawList*, ImDrawCmd*, void> imDrawCallback = (delegate*<ImDrawList*, ImDrawCmd*, void>)cmdPtr.UserCallback;
+                            delegate* unmanaged<ImDrawList*, ImDrawCmd*, void> imDrawCallback = (delegate* unmanaged<ImDrawList*, ImDrawCmd*, void>)cmdPtr.UserCallback;
                             if (imDrawCallback != null)
                             {
                                 imDrawCallback(cmdList, cmdPtr);
                             }
-#else
-                            throw new NotImplementedException();
-#endif
                         }
                     }
                     else

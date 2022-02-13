@@ -224,16 +224,12 @@ namespace ImGuiBackends.Direct3D11
                         }
                         else
                         {
-#if NET6_0
                             // typedef void (*ImDrawCallback)(const ImDrawList* parent_list, const ImDrawCmd* cmd);
-                            delegate*<ImDrawList*, ImDrawCmd*, void> imDrawCallback = (delegate*<ImDrawList*, ImDrawCmd*, void>)cmdPtr.UserCallback;
+                            delegate* unmanaged<ImDrawList*, ImDrawCmd*, void> imDrawCallback = (delegate* unmanaged<ImDrawList*, ImDrawCmd*, void>)cmdPtr.UserCallback;
                             if (imDrawCallback != null)
                             {
                                 imDrawCallback(cmdList, cmdPtr);
                             }
-#else
-                            throw new NotImplementedException();
-#endif
                         }
                     }
                     else
@@ -259,7 +255,6 @@ namespace ImGuiBackends.Direct3D11
                 globalVtxOffset += cmdList.VtxBuffer.Size;
             }
             this.RestoreState(&backup);
-
             // backup disposed here.
         }
 
