@@ -3,9 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.1.32127.271
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImGuiBackends.OpenGL3", "ImGuiBackends.OpenGL3\ImGuiBackends.OpenGL3.csproj", "{DFE5DD7E-767B-4B64-A6A9-2B638E163FA1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ImGuiBackends.OpenGL3", "ImGuiBackends.OpenGL3\ImGuiBackends.OpenGL3.csproj", "{DFE5DD7E-767B-4B64-A6A9-2B638E163FA1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImGuiBackends.Direct3D11", "ImGuiBackends.Direct3D11\ImGuiBackends.Direct3D11.csproj", "{9D7C88D7-A9E3-4B64-8BE2-7EA25C09432C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ImGuiBackends.Direct3D11", "ImGuiBackends.Direct3D11\ImGuiBackends.Direct3D11.csproj", "{9D7C88D7-A9E3-4B64-8BE2-7EA25C09432C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ImGuiBackends.Common", "ImGuiBackends.Common\ImGuiBackends.Common.csproj", "{2524605D-8AD2-4704-9A79-BBB99E9F6877}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{9D7C88D7-A9E3-4B64-8BE2-7EA25C09432C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9D7C88D7-A9E3-4B64-8BE2-7EA25C09432C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9D7C88D7-A9E3-4B64-8BE2-7EA25C09432C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2524605D-8AD2-4704-9A79-BBB99E9F6877}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2524605D-8AD2-4704-9A79-BBB99E9F6877}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2524605D-8AD2-4704-9A79-BBB99E9F6877}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2524605D-8AD2-4704-9A79-BBB99E9F6877}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
