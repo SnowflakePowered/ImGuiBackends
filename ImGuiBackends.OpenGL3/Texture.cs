@@ -23,7 +23,6 @@ namespace ImGuiBackends.OpenGL3
 
         public static float? MaxAniso;
         private readonly GL _gl;
-        public readonly string Name;
         public readonly uint GlTexture;
         public readonly uint Width, Height;
         public readonly uint MipmapLevels;

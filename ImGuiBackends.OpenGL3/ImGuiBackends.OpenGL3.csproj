@@ -3,7 +3,9 @@
   <PropertyGroup>
     <TargetFrameworks>net5.0;net6.0</TargetFrameworks>
     <DefineConstants>GL</DefineConstants>
+    <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>10</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

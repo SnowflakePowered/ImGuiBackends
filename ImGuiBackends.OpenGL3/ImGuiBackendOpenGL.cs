@@ -1,6 +1,7 @@
 ﻿using ImGuiNET;
 using System;
 using System.Numerics;
+using System.Diagnostics.CodeAnalysis;
 
 #if GLES
 using Silk.NET.OpenGLES;
@@ -12,10 +13,10 @@ namespace ImGuiBackends.OpenGL3
 {
     // Literally ripped from with all the input stuff stripped out.
     // https://github.com/dotnet/Silk.NET/blob/main/src/OpenGL/Extensions/Silk.NET.OpenGL.Extensions.ImGui/ImGuiController.cs
-    public class ImGuiBackendOpenGL
+    public partial class ImGuiBackendOpenGL
     {
-        private GL _gl;
-        private Version _glVersion;
+        private GL? _gl;
+        private Version? _glVersion;
 
         private int _attribLocationTex;
         private int _attribLocationProjMtx;
@@ -29,9 +30,10 @@ namespace ImGuiBackends.OpenGL3
         private nuint _vertexBufferSize;
         private nuint _indexBufferSize;
 
-        private Texture _fontTexture;
-        private Shader _shader;
+        private Texture? _fontTexture;
+        private Shader? _shader;
 
+        [MemberNotNull("_gl", "_glVersion")]
         public void Init(GL gl)
         {
             _gl = gl;
@@ -40,8 +42,15 @@ namespace ImGuiBackends.OpenGL3
 #if GL
             var io = ImGui.GetIO();
             if (_glVersion.Major >= 3 && _glVersion.Minor >= 2)
+            {
+                // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
                 io.BackendFlags = io.BackendFlags | ImGuiBackendFlags.RendererHasVtxOffset;
+            }
 #endif
+
+            io.BackendFlags |= ImGuiBackendFlags.RendererHasViewports;
+
+            if (io.ConfigFlags.HasFlag(ImGuiConfigFlags.ViewportsEnable)) this.InitPlatformInterface();
         }
 
         public void NewFrame()
@@ -57,6 +66,9 @@ namespace ImGuiBackends.OpenGL3
             int framebufferWidth = (int)(drawDataPtr.DisplaySize.X * drawDataPtr.FramebufferScale.X);
             int framebufferHeight = (int)(drawDataPtr.DisplaySize.Y * drawDataPtr.FramebufferScale.Y);
             if (framebufferWidth <= 0 || framebufferHeight <= 0)
+                return;
+
+            if (_gl == null)
                 return;
 
             // Backup GL state
@@ -256,11 +268,9 @@ namespace ImGuiBackends.OpenGL3
             _gl.Scissor(lastScissorBox[0], lastScissorBox[1], (uint)lastScissorBox[2], (uint)lastScissorBox[3]);
         }
 
+        [MemberNotNull("_shader")]
         public unsafe bool CreateDeviceObjects()
         {
-            if (_gl == null)
-                return false;
-
             // Backup GL state
             _gl.GetInteger(GLEnum.TextureBinding2D, out int lastTexture);
             _gl.GetInteger(GLEnum.ArrayBufferBinding, out int lastArrayBuffer);
@@ -356,13 +366,14 @@ namespace ImGuiBackends.OpenGL3
             _gl.DeleteBuffer(_vboHandle);
             _gl.DeleteBuffer(_elementsHandle);
             _gl.DeleteVertexArray(_vertexArrayObject);
-            _shader.Dispose();
-            _fontTexture.Dispose();
+            _shader?.Dispose();
+            _fontTexture?.Dispose();
         }
 
         public void Shutdown()
         {
             // Nothing much to do here since we don't need to release any device pointers.
+            this.ShutdownPlatformInterface();
             this.InvalidateDeviceObjects();
 
             // let go of the GL context..
@@ -392,25 +403,13 @@ namespace ImGuiBackends.OpenGL3
             float B = drawDataPtr.DisplayPos.Y + drawDataPtr.DisplaySize.Y;
 
             Span<float> orthoProjection = stackalloc float[] {
-                2.0f / (R - L),
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                2.0f / (T - B),
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                -1.0f,
-                0.0f,
-                (R + L) / (L - R),
-                (T + B) / (B - T),
-                0.0f,
-                1.0f,
+                2.0f / (R - L), 0.0f, 0.0f, 0.0f,
+                0.0f, 2.0f / (T - B), 0.0f, 0.0f,
+                0.0f, 0.0f, -1.0f, 0.0f,
+                (R + L) / (L - R), (T + B) / (B - T), 0.0f, 1.0f,
             };
 
-            _shader.UseShader();
+            _shader?.UseShader();
             _gl.Uniform1(_attribLocationTex, 0);
             _gl.UniformMatrix4(_attribLocationProjMtx, 1, false, orthoProjection);
             _gl.CheckGlError("Projection");
@@ -438,6 +437,7 @@ namespace ImGuiBackends.OpenGL3
         /// <summary>
         /// Creates the texture used to render text.
         /// </summary>
+        [MemberNotNull("_fontTexture")]
         private unsafe void CreateFontsTexture()
         {
             // Build texture atlas
