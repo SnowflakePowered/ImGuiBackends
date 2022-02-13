@@ -10,7 +10,12 @@ using System.Runtime.InteropServices;
 
 namespace ImGuiBackends.Direct3D11
 {
+#if IMGUIBACKENDS_COMMON
+    using ImGuiBackends.Common;
+    public partial class ImGuiBackendDirect3D11: IImGuiRenderer
+#else
     public partial class ImGuiBackendDirect3D11
+#endif
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool CheckDxError(int error, string title)
@@ -41,50 +46,10 @@ namespace ImGuiBackends.Direct3D11
         private int _vertexBufferSize;
         private int _indexBufferSize;
         private bool _backupState;
+
         private static unsafe readonly byte* CSTR_POSITION = (byte*)SilkMarshal.StringToPtr("POSITION");
         private static unsafe readonly byte* CSTR_TEXCOORD = (byte*)SilkMarshal.StringToPtr("TEXCOORD");
         private static unsafe readonly byte* CSTR_COLOR = (byte*)SilkMarshal.StringToPtr("COLOR");
-
-        private unsafe void SetupRenderState(in ImDrawDataPtr drawData)
-        {
-            // Setup viewport
-            Viewport vp = new()
-            {
-                Width = drawData.DisplaySize.X,
-                Height = drawData.DisplaySize.Y,
-                MinDepth = 0f,
-                MaxDepth = 1f,
-                TopLeftX = 0,
-                TopLeftY = 0,
-            };
-
-            _deviceContext->RSSetViewports(1, &vp);
-
-            // Setup shader and vertex buffers
-            uint stride = (uint)sizeof(ImDrawVert);
-            uint offset = 0;
-
-            _deviceContext->IASetInputLayout(_inputLayout);
-            _deviceContext->IASetVertexBuffers(0, 1, ref _vertexBuffer, &stride, &offset);
-            _deviceContext->IASetIndexBuffer(_indexBuffer, sizeof(ushort) == 2 ? Format.FormatR16Uint : Format.FormatR32Uint, 0);
-            _deviceContext->IASetPrimitiveTopology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist);
-            _deviceContext->VSSetShader(_vertexShader, null, 0);
-            _deviceContext->VSSetConstantBuffers(0, 1, ref _vertexConstantBuffer);
-            _deviceContext->PSSetShader(_pixelShader, null, 0);
-            _deviceContext->PSSetSamplers(0, 1, ref _fontSampler);
-            _deviceContext->GSSetShader(null, null, 0);
-            _deviceContext->HSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
-            _deviceContext->DSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
-            _deviceContext->CSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
-
-            // Setup blend state
-            Vector4 blendFactor = new(0, 0, 0, 0);
-            _deviceContext->OMSetBlendState(_blendState, (float*)&blendFactor, 0xffffffff);
-
-            _deviceContext->OMSetDepthStencilState(_depthStencilState, 0);
-            _deviceContext->RSSetState(_rasterizerState);
-        }
-
         public unsafe void RenderDrawData(ImDrawDataPtr drawData)
         {
             // Avoid rendering when minimized
@@ -181,7 +146,7 @@ namespace ImGuiBackends.Direct3D11
             // DisplayPos is (0,0) for single viewport apps.
             {
                 MappedSubresource projectionMatrix = new();
-                if (CheckDxError(deviceContext->Map((ID3D11Resource*)_vertexConstantBuffer, 
+                if (CheckDxError(deviceContext->Map((ID3D11Resource*)_vertexConstantBuffer,
                     0, Map.MapWriteDiscard, 0, &projectionMatrix), "Map Projection Matrix"))
                     return;
 
@@ -189,12 +154,13 @@ namespace ImGuiBackends.Direct3D11
                 float R = drawData.DisplayPos.X + drawData.DisplaySize.X;
                 float T = drawData.DisplayPos.Y;
                 float B = drawData.DisplayPos.Y + drawData.DisplaySize.Y;
+
                 float* mvp = stackalloc float[]
                 {
-                    2f / (R - L), 0, 0, 0,
-                    0, 2f / (T - B), 0, 0,
-                    0, 0, 0.5f, 0,
-                    (R + L) / (L - R), (T + B) / (B - T), 0.5f, 1f
+                    2f/(R-L),     0,              0,      0,
+                    0,            2f/(T-B),       0,      0,
+                    0,            0,              0.5f,   0,
+                    (R+L)/(L-R),  (T+B)/(B-T),    0.5f,   1f
                 };
 
                 Buffer.MemoryCopy(mvp, projectionMatrix.PData, 16 * sizeof(float), 16 * sizeof(float));
@@ -225,7 +191,8 @@ namespace ImGuiBackends.Direct3D11
                         else
                         {
                             // typedef void (*ImDrawCallback)(const ImDrawList* parent_list, const ImDrawCmd* cmd);
-                            delegate* unmanaged<ImDrawList*, ImDrawCmd*, void> imDrawCallback = (delegate* unmanaged<ImDrawList*, ImDrawCmd*, void>)cmdPtr.UserCallback;
+                            delegate* unmanaged<ImDrawList*, ImDrawCmd*, void> imDrawCallback = 
+                                (delegate* unmanaged<ImDrawList*, ImDrawCmd*, void>)cmdPtr.UserCallback;
                             if (imDrawCallback != null)
                             {
                                 imDrawCallback(cmdList, cmdPtr);
@@ -257,95 +224,32 @@ namespace ImGuiBackends.Direct3D11
             this.RestoreState(&backup);
             // backup disposed here.
         }
-
-        /// <summary>
-        /// Restore DX11 Device State.
-        /// 
-        /// If <see cref="_backupState"/> is false, this method does nothing.
-        /// </summary>
-        /// <param name="_backup">A pointer to a stack-allocated <see cref="D3D11StateBackup"/> instance.</param>
-        private unsafe void RestoreState(D3D11StateBackup* _backup)
+        public unsafe void Shutdown()
         {
-            if (!_backupState)
-                return;
-
-            ID3D11DeviceContext* deviceContext = _deviceContext;
-
-            ref readonly D3D11StateBackup backup = ref *_backup;
-
-            deviceContext->IASetInputLayout(backup.InputLayout);
-            deviceContext->IASetIndexBuffer(backup.IndexBuffer, backup.IndexBufferFormat, backup.IndexBufferOffset);
-            deviceContext->IASetPrimitiveTopology(backup.PrimitiveTopology);
-            deviceContext->IASetVertexBuffers(0, (uint)backup.VertexBuffers.Length, backup.VertexBuffers,
-                   backup.VertexBufferStrides, backup.VertexBufferOffsets);
-
-            // -- RS
-            deviceContext->RSSetState(backup.RS);
-            deviceContext->RSSetScissorRects(backup.ScissorRectsCount, backup.ScissorRects);
-            deviceContext->RSSetViewports(backup.ViewportsCount, backup.Viewports);
-            
-            // -- OM
-            deviceContext->OMSetBlendState(backup.BlendState, _backup->BlendFactor, backup.SampleMask);
-            deviceContext->OMSetDepthStencilState(backup.DepthStencilState, backup.DepthStencilRef);
-            deviceContext->OMSetRenderTargets((uint)backup.RenderTargetViews.Length, backup.RenderTargetViews, backup.DepthStencilView);
-
-            // -- VS
-            deviceContext->VSSetShader(backup.VS, backup.VSBackup.Instances, backup.VSBackup.InstancesCount);
-            deviceContext->VSSetSamplers(0, (uint)backup.VSBackup.Samplers.Length, backup.VSBackup.Samplers);
-            deviceContext->VSSetConstantBuffers(0, (uint)backup.VSBackup.ConstantBuffers.Length, backup.VSBackup.ConstantBuffers);
-            deviceContext->VSSetShaderResources(0, (uint)backup.VSBackup.ResourceViews.Length, backup.VSBackup.ResourceViews);
-
-            // -- HS
-            deviceContext->HSSetShader(backup.HS, backup.HSBackup.Instances, backup.HSBackup.InstancesCount);
-            deviceContext->HSSetSamplers(0, (uint)backup.HSBackup.Samplers.Length, backup.HSBackup.Samplers);
-            deviceContext->HSSetConstantBuffers(0, (uint)backup.HSBackup.ConstantBuffers.Length, backup.HSBackup.ConstantBuffers);
-            deviceContext->HSSetShaderResources(0, (uint)backup.HSBackup.ResourceViews.Length, backup.HSBackup.ResourceViews);
-
-            // -- DS
-            deviceContext->DSSetShader(backup.DS, backup.DSBackup.Instances, backup.DSBackup.InstancesCount);
-            deviceContext->DSSetSamplers(0, (uint)backup.DSBackup.Samplers.Length, backup.DSBackup.Samplers);
-            deviceContext->DSSetConstantBuffers(0, (uint)backup.DSBackup.ConstantBuffers.Length, backup.DSBackup.ConstantBuffers);
-            deviceContext->DSSetShaderResources(0, (uint)backup.DSBackup.ResourceViews.Length, backup.DSBackup.ResourceViews);
-
-            // -- GS
-            deviceContext->GSSetShader(backup.GS, backup.GSBackup.Instances, backup.GSBackup.InstancesCount);
-            deviceContext->GSSetSamplers(0, (uint)backup.GSBackup.Samplers.Length, backup.GSBackup.Samplers);
-            deviceContext->GSSetConstantBuffers(0, (uint)backup.GSBackup.ConstantBuffers.Length, backup.GSBackup.ConstantBuffers);
-            deviceContext->GSSetShaderResources(0, (uint)backup.GSBackup.ResourceViews.Length, backup.GSBackup.ResourceViews);
-
-            // -- PS
-            deviceContext->PSSetShader(backup.PS, backup.PSBackup.Instances, backup.PSBackup.InstancesCount);
-            deviceContext->PSSetSamplers(0, (uint)backup.PSBackup.Samplers.Length, backup.PSBackup.Samplers);
-            deviceContext->PSSetConstantBuffers(0, (uint)backup.PSBackup.ConstantBuffers.Length, backup.PSBackup.ConstantBuffers);
-            deviceContext->PSSetShaderResources(0, (uint)backup.PSBackup.ResourceViews.Length, backup.PSBackup.ResourceViews);
-
-            // -- CS
-            deviceContext->CSSetShader(backup.CS, backup.CSBackup.Instances, backup.CSBackup.InstancesCount);
-            deviceContext->CSSetSamplers(0, (uint)backup.CSBackup.Samplers.Length, backup.CSBackup.Samplers);
-            deviceContext->CSSetConstantBuffers(0, (uint)backup.CSBackup.ConstantBuffers.Length, backup.CSBackup.ConstantBuffers);
-            deviceContext->CSSetShaderResources(0, (uint)backup.CSBackup.ResourceViews.Length, backup.CSBackup.ResourceViews);
-
-            // CSUAVs are never very big, shouldn't worry about overflow here.
-            uint* uavInitialCounts = stackalloc uint[backup.CSUAVs.Length];
-            for (int i = 0; i < backup.CSUAVs.Length; i++)
-                uavInitialCounts[i] = unchecked((uint)-1);
-
-            deviceContext->CSSetUnorderedAccessViews(0, (uint)backup.CSUAVs.Length, backup.CSUAVs, uavInitialCounts);
+            this.ShutdownPlatformInterface();
+            this.InvalidateDeviceObjects();
+            if (_factory != null) _factory->Release();
+            if (_device != null) _device->Release();
+            if (_deviceContext != null) _deviceContext->Release();
         }
-
+        public unsafe void NewFrame()
+        {
+            if (_fontSampler == null)
+                this.CreateDeviceObjects();
+        }
         public unsafe void InvalidateDeviceObjects()
         {
             if (_device == null)
                 return;
 
             if (_fontSampler != null) { _fontSampler->Release(); _fontSampler = null; }
-            if (_fontTextureView != null) 
+            if (_fontTextureView != null)
             {
-                _fontTextureView->Release(); 
+                _fontTextureView->Release();
                 _fontTextureView = null;
                 // We copied data->pFontTextureView to io.Fonts->TexID so let's clear that as well.
-                ImGui.GetIO().Fonts.SetTexID((nint)0);  
-            } 
+                ImGui.GetIO().Fonts.SetTexID((nint)0);
+            }
             if (_indexBuffer != null) { _indexBuffer->Release(); _indexBuffer = null; }
             if (_vertexBuffer != null) { _vertexBuffer->Release(); _vertexBuffer = null; }
             if (_blendState != null) { _blendState->Release(); _blendState = null; }
@@ -356,7 +260,6 @@ namespace ImGuiBackends.Direct3D11
             if (_inputLayout != null) { _inputLayout->Release(); _inputLayout = null; }
             if (_vertexShader != null) { _vertexShader->Release(); _vertexShader = null; }
         }
-
         public unsafe bool CreateDeviceObjects()
         {
             if (_device == null)
@@ -372,14 +275,14 @@ namespace ImGuiBackends.Direct3D11
                 if (CheckDxError(_device->CreateVertexShader(vertexBuffer,
                        vertexBufferSize, null, ref _vertexShader), "Create Vertex Shader"))
                     return false;
-  
+
                 InputElementDesc* localLayout = stackalloc InputElementDesc[]
                 {
                     new(CSTR_POSITION, 0, Format.FormatR32G32Float, 0, (uint)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.pos)), InputClassification.InputPerVertexData, 0),
                     new(CSTR_TEXCOORD, 0, Format.FormatR32G32Float, 0, (uint)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.uv)), InputClassification.InputPerVertexData, 0),
                     new(CSTR_COLOR, 0, Format.FormatR8G8B8A8Unorm, 0, (uint)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.col)), InputClassification.InputPerVertexData, 0)
                 };
-                if (CheckDxError(_device->CreateInputLayout(localLayout, 3, vertexBuffer, vertexBufferSize, ref _inputLayout), 
+                if (CheckDxError(_device->CreateInputLayout(localLayout, 3, vertexBuffer, vertexBufferSize, ref _inputLayout),
                         "Create Input Layout"))
                     return false;
             }
@@ -394,7 +297,7 @@ namespace ImGuiBackends.Direct3D11
                     MiscFlags = 0,
                     ByteWidth = 16 * sizeof(float)
                 };
-            
+
                 CheckDxError(_device->CreateBuffer(&desc, null, ref _vertexConstantBuffer), "Create VertexConstantBuffer");
             }
 
@@ -475,16 +378,16 @@ namespace ImGuiBackends.Direct3D11
             return true;
         }
 
+#region Init
         public unsafe void Init(IntPtr device, IntPtr deviceContext, bool backupState = true)
         {
             this.Init((ID3D11Device*)device.ToPointer(), (ID3D11DeviceContext*)deviceContext.ToPointer(), backupState);
         }
-
         public unsafe void Init(ID3D11Device* device, ID3D11DeviceContext* deviceContext, bool backupState = true)
         {
             var io = ImGui.GetIO();
             // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
-            io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasViewports; 
+            io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasViewports;
 
             this._backupState = backupState;
 
@@ -516,23 +419,49 @@ namespace ImGuiBackends.Direct3D11
 
             if (io.ConfigFlags.HasFlag(ImGuiConfigFlags.ViewportsEnable)) this.InitPlatformInterface();
         }
+#endregion
 
-        public unsafe void Shutdown()
+#region Private Members
+        private unsafe void SetupRenderState(in ImDrawDataPtr drawData)
         {
-            this.ShutdownPlatformInterface();
-            this.InvalidateDeviceObjects();
-            if (_factory != null) _factory->Release();
-            if (_device != null) _device->Release();
-            if (_deviceContext != null) _deviceContext->Release();
+            // Setup viewport
+            Viewport vp = new()
+            {
+                Width = drawData.DisplaySize.X,
+                Height = drawData.DisplaySize.Y,
+                MinDepth = 0f,
+                MaxDepth = 1f,
+                TopLeftX = 0,
+                TopLeftY = 0,
+            };
+
+            _deviceContext->RSSetViewports(1, &vp);
+
+            // Setup shader and vertex buffers
+            uint stride = (uint)sizeof(ImDrawVert);
+            uint offset = 0;
+
+            _deviceContext->IASetInputLayout(_inputLayout);
+            _deviceContext->IASetVertexBuffers(0, 1, ref _vertexBuffer, &stride, &offset);
+            _deviceContext->IASetIndexBuffer(_indexBuffer, sizeof(ushort) == 2 ? Format.FormatR16Uint : Format.FormatR32Uint, 0);
+            _deviceContext->IASetPrimitiveTopology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist);
+            _deviceContext->VSSetShader(_vertexShader, null, 0);
+            _deviceContext->VSSetConstantBuffers(0, 1, ref _vertexConstantBuffer);
+            _deviceContext->PSSetShader(_pixelShader, null, 0);
+            _deviceContext->PSSetSamplers(0, 1, ref _fontSampler);
+            _deviceContext->GSSetShader(null, null, 0);
+            _deviceContext->HSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
+            _deviceContext->DSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
+            _deviceContext->CSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
+
+            // Setup blend state
+            Vector4 blendFactor = new(0, 0, 0, 0);
+            _deviceContext->OMSetBlendState(_blendState, (float*)&blendFactor, 0xffffffff);
+
+            _deviceContext->OMSetDepthStencilState(_depthStencilState, 0);
+            _deviceContext->RSSetState(_rasterizerState);
         }
 
-        public unsafe void NewFrame()
-        {
-            if (_fontSampler == null)
-                this.CreateDeviceObjects();
-        }
-
-#region Internal
         private unsafe void CreateFontsTexture()
         {
             var io = ImGui.GetIO();
@@ -604,6 +533,82 @@ namespace ImGuiBackends.Direct3D11
 
                 CheckDxError(_device->CreateSamplerState(&desc, ref _fontSampler), "Create Text Sampler");
             }
+        }
+
+#region State Backup
+        /// <summary>
+        /// Restore DX11 Device State.
+        /// 
+        /// If <see cref="_backupState"/> is false, this method does nothing.
+        /// </summary>
+        /// <param name="_backup">A pointer to a stack-allocated <see cref="D3D11StateBackup"/> instance.</param>
+        private unsafe void RestoreState(D3D11StateBackup* _backup)
+        {
+            if (!_backupState)
+                return;
+
+            ID3D11DeviceContext* deviceContext = _deviceContext;
+
+            ref readonly D3D11StateBackup backup = ref *_backup;
+
+            deviceContext->IASetInputLayout(backup.InputLayout);
+            deviceContext->IASetIndexBuffer(backup.IndexBuffer, backup.IndexBufferFormat, backup.IndexBufferOffset);
+            deviceContext->IASetPrimitiveTopology(backup.PrimitiveTopology);
+            deviceContext->IASetVertexBuffers(0, (uint)backup.VertexBuffers.Length, backup.VertexBuffers,
+                   backup.VertexBufferStrides, backup.VertexBufferOffsets);
+
+            // -- RS
+            deviceContext->RSSetState(backup.RS);
+            deviceContext->RSSetScissorRects(backup.ScissorRectsCount, backup.ScissorRects);
+            deviceContext->RSSetViewports(backup.ViewportsCount, backup.Viewports);
+
+            // -- OM
+            deviceContext->OMSetBlendState(backup.BlendState, _backup->BlendFactor, backup.SampleMask);
+            deviceContext->OMSetDepthStencilState(backup.DepthStencilState, backup.DepthStencilRef);
+            deviceContext->OMSetRenderTargets((uint)backup.RenderTargetViews.Length, backup.RenderTargetViews, backup.DepthStencilView);
+
+            // -- VS
+            deviceContext->VSSetShader(backup.VS, backup.VSBackup.Instances, backup.VSBackup.InstancesCount);
+            deviceContext->VSSetSamplers(0, (uint)backup.VSBackup.Samplers.Length, backup.VSBackup.Samplers);
+            deviceContext->VSSetConstantBuffers(0, (uint)backup.VSBackup.ConstantBuffers.Length, backup.VSBackup.ConstantBuffers);
+            deviceContext->VSSetShaderResources(0, (uint)backup.VSBackup.ResourceViews.Length, backup.VSBackup.ResourceViews);
+
+            // -- HS
+            deviceContext->HSSetShader(backup.HS, backup.HSBackup.Instances, backup.HSBackup.InstancesCount);
+            deviceContext->HSSetSamplers(0, (uint)backup.HSBackup.Samplers.Length, backup.HSBackup.Samplers);
+            deviceContext->HSSetConstantBuffers(0, (uint)backup.HSBackup.ConstantBuffers.Length, backup.HSBackup.ConstantBuffers);
+            deviceContext->HSSetShaderResources(0, (uint)backup.HSBackup.ResourceViews.Length, backup.HSBackup.ResourceViews);
+
+            // -- DS
+            deviceContext->DSSetShader(backup.DS, backup.DSBackup.Instances, backup.DSBackup.InstancesCount);
+            deviceContext->DSSetSamplers(0, (uint)backup.DSBackup.Samplers.Length, backup.DSBackup.Samplers);
+            deviceContext->DSSetConstantBuffers(0, (uint)backup.DSBackup.ConstantBuffers.Length, backup.DSBackup.ConstantBuffers);
+            deviceContext->DSSetShaderResources(0, (uint)backup.DSBackup.ResourceViews.Length, backup.DSBackup.ResourceViews);
+
+            // -- GS
+            deviceContext->GSSetShader(backup.GS, backup.GSBackup.Instances, backup.GSBackup.InstancesCount);
+            deviceContext->GSSetSamplers(0, (uint)backup.GSBackup.Samplers.Length, backup.GSBackup.Samplers);
+            deviceContext->GSSetConstantBuffers(0, (uint)backup.GSBackup.ConstantBuffers.Length, backup.GSBackup.ConstantBuffers);
+            deviceContext->GSSetShaderResources(0, (uint)backup.GSBackup.ResourceViews.Length, backup.GSBackup.ResourceViews);
+
+            // -- PS
+            deviceContext->PSSetShader(backup.PS, backup.PSBackup.Instances, backup.PSBackup.InstancesCount);
+            deviceContext->PSSetSamplers(0, (uint)backup.PSBackup.Samplers.Length, backup.PSBackup.Samplers);
+            deviceContext->PSSetConstantBuffers(0, (uint)backup.PSBackup.ConstantBuffers.Length, backup.PSBackup.ConstantBuffers);
+            deviceContext->PSSetShaderResources(0, (uint)backup.PSBackup.ResourceViews.Length, backup.PSBackup.ResourceViews);
+
+            // -- CS
+            deviceContext->CSSetShader(backup.CS, backup.CSBackup.Instances, backup.CSBackup.InstancesCount);
+            deviceContext->CSSetSamplers(0, (uint)backup.CSBackup.Samplers.Length, backup.CSBackup.Samplers);
+            deviceContext->CSSetConstantBuffers(0, (uint)backup.CSBackup.ConstantBuffers.Length, backup.CSBackup.ConstantBuffers);
+            deviceContext->CSSetShaderResources(0, (uint)backup.CSBackup.ResourceViews.Length, backup.CSBackup.ResourceViews);
+
+            // CSUAVs are never very big, shouldn't worry about overflow here.
+            uint* uavInitialCounts = stackalloc uint[backup.CSUAVs.Length];
+            for (int i = 0; i < backup.CSUAVs.Length; i++)
+                uavInitialCounts[i] = unchecked((uint)-1);
+
+            deviceContext->CSSetUnorderedAccessViews(0, (uint)backup.CSUAVs.Length, backup.CSUAVs, uavInitialCounts);
         }
 
         // Full state save ported from 
@@ -714,6 +719,7 @@ namespace ImGuiBackends.Direct3D11
 
             return backup;
         }
+#endregion
 #endregion
     }
 }

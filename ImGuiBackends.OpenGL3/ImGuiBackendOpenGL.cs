@@ -11,9 +11,14 @@ using Silk.NET.OpenGL;
 
 namespace ImGuiBackends.OpenGL3
 {
-    // Literally ripped from with all the input stuff stripped out.
+    // Literally ripped from here with all the input stuff stripped out.
     // https://github.com/dotnet/Silk.NET/blob/main/src/OpenGL/Extensions/Silk.NET.OpenGL.Extensions.ImGui/ImGuiController.cs
+#if IMGUIBACKENDS_COMMON
+    using ImGuiBackends.Common;
+    public partial class ImGuiBackendOpenGL : IImGuiRenderer
+#else
     public partial class ImGuiBackendOpenGL
+#endif
     {
         private GL? _gl;
         private Version? _glVersion;
@@ -52,7 +57,6 @@ namespace ImGuiBackends.OpenGL3
 
             if (io.ConfigFlags.HasFlag(ImGuiConfigFlags.ViewportsEnable)) this.InitPlatformInterface();
         }
-
         public void NewFrame()
         {
             if (_shader == null)
@@ -60,7 +64,6 @@ namespace ImGuiBackends.OpenGL3
                 this.CreateDeviceObjects();
             }
         }
-
         public unsafe void RenderDrawData(ImDrawDataPtr drawDataPtr)
         {
             int framebufferWidth = (int)(drawDataPtr.DisplaySize.X * drawDataPtr.FramebufferScale.X);
@@ -357,7 +360,6 @@ namespace ImGuiBackends.OpenGL3
             _gl.CheckGlError("End of ImGui setup");
             return _gl.GetError() == GLEnum.NoError;
         }
-
         public unsafe void InvalidateDeviceObjects()
         {
             if (_gl == null)
@@ -369,7 +371,6 @@ namespace ImGuiBackends.OpenGL3
             _shader?.Dispose();
             _fontTexture?.Dispose();
         }
-
         public void Shutdown()
         {
             // Nothing much to do here since we don't need to release any device pointers.
@@ -381,7 +382,7 @@ namespace ImGuiBackends.OpenGL3
             _glVersion = null;
         }
 
-        #region Internal
+#region Internal
         private unsafe void SetupRenderState(ImDrawDataPtr drawData, int framebufferWidth, int framebufferHeight)
         {
             // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
@@ -461,6 +462,6 @@ namespace ImGuiBackends.OpenGL3
             // Restore state
             _gl.BindTexture(GLEnum.Texture2D, (uint)lastTexture);
         }
-        #endregion
+#endregion
     }
 }

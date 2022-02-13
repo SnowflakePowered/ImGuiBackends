@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net5.0;net6.0</TargetFrameworks>
+    <TargetFrameworks>net6.0</TargetFrameworks>
     <DefineConstants>GL</DefineConstants>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -13,5 +13,12 @@
     <PackageReference Include="Silk.NET.OpenGL" Version="2.13.0" />
     <PackageReference Include="Silk.NET.OpenGLES" Version="2.13.0" />
   </ItemGroup>
+
+  <ItemGroup Condition=" '$(ImGuiBackendsUseCommon)' == 'true'">
+    <ProjectReference Include="..\ImGuiBackends.Common\ImGuiBackends.Common.csproj" />
+  </ItemGroup>
+  <PropertyGroup Condition=" '$(ImGuiBackendsUseCommon)' == 'true'">
+    <DefineConstants>IMGUIBACKENDS_COMMON</DefineConstants>
+  </PropertyGroup>
 
 </Project>
