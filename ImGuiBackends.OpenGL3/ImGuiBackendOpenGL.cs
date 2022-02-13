@@ -382,7 +382,7 @@ namespace ImGuiBackends.OpenGL3
         }
 
         #region Internal
-        private unsafe void SetupRenderState(ImDrawDataPtr drawDataPtr, int framebufferWidth, int framebufferHeight)
+        private unsafe void SetupRenderState(ImDrawDataPtr drawData, int framebufferWidth, int framebufferHeight)
         {
             // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
             _gl.Enable(GLEnum.Blend);
@@ -397,10 +397,13 @@ namespace ImGuiBackends.OpenGL3
             _gl.PolygonMode(GLEnum.FrontAndBack, GLEnum.Fill);
 #endif
 
-            float L = drawDataPtr.DisplayPos.X;
-            float R = drawDataPtr.DisplayPos.X + drawDataPtr.DisplaySize.X;
-            float T = drawDataPtr.DisplayPos.Y;
-            float B = drawDataPtr.DisplayPos.Y + drawDataPtr.DisplaySize.Y;
+            _gl.Viewport(0, 0, (uint)(drawData.DisplaySize.X * drawData.FramebufferScale.X), 
+                (uint)(drawData.DisplaySize.Y * drawData.FramebufferScale.Y));
+
+            float L = drawData.DisplayPos.X;
+            float R = drawData.DisplayPos.X + drawData.DisplaySize.X;
+            float T = drawData.DisplayPos.Y;
+            float B = drawData.DisplayPos.Y + drawData.DisplaySize.Y;
 
             Span<float> orthoProjection = stackalloc float[] {
                 2.0f / (R - L), 0.0f, 0.0f, 0.0f,
