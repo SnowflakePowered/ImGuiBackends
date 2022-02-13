@@ -272,7 +272,7 @@ namespace ImGuiBackends.OpenGL3
         public unsafe bool CreateDeviceObjects()
         {
             // Backup GL state
-            _gl.GetInteger(GLEnum.TextureBinding2D, out int lastTexture);
+            _gl!.GetInteger(GLEnum.TextureBinding2D, out int lastTexture);
             _gl.GetInteger(GLEnum.ArrayBufferBinding, out int lastArrayBuffer);
             _gl.GetInteger(GLEnum.VertexArrayBinding, out int lastVertexArray);
 
@@ -385,7 +385,7 @@ namespace ImGuiBackends.OpenGL3
         private unsafe void SetupRenderState(ImDrawDataPtr drawData, int framebufferWidth, int framebufferHeight)
         {
             // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
-            _gl.Enable(GLEnum.Blend);
+            _gl!.Enable(GLEnum.Blend);
             _gl.BlendEquation(GLEnum.FuncAdd);
             _gl.BlendFuncSeparate(GLEnum.SrcAlpha, GLEnum.OneMinusSrcAlpha, GLEnum.One, GLEnum.OneMinusSrcAlpha);
             _gl.Disable(GLEnum.CullFace);
@@ -448,7 +448,7 @@ namespace ImGuiBackends.OpenGL3
             io.Fonts.GetTexDataAsRGBA32(out IntPtr pixels, out int width, out int height, out int _bytesPerPixel);   // Load as RGBA 32-bit (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders. If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
 
             // Upload texture to graphics system
-            _gl.GetInteger(GLEnum.Texture2D, out int lastTexture);
+            _gl!.GetInteger(GLEnum.Texture2D, out int lastTexture);
 
             _fontTexture = new Texture(_gl, width, height, pixels);
             _fontTexture.Bind();

@@ -24,20 +24,20 @@ namespace ImGuiBackends.Direct3D11
             return error < 0;
         }
 
-        private unsafe ID3D11Device* _pd3dDevice;
+        private unsafe ID3D11Device* _device;
         private unsafe ID3D11DeviceContext* _deviceContext;
-        private unsafe IDXGIFactory* _pFactory;
-        private unsafe ID3D11Buffer* _pVB;
-        private unsafe ID3D11Buffer* _pIB;
-        private unsafe ID3D11VertexShader* _pVertexShader;
-        private unsafe ID3D11InputLayout* _pInputLayout;
-        private unsafe ID3D11Buffer* _pVertexConstantBuffer;
-        private unsafe ID3D11PixelShader* _pPixelShader;
-        private unsafe ID3D11SamplerState* _pFontSampler;
-        private unsafe ID3D11ShaderResourceView* _pFontTextureView;
-        private unsafe ID3D11RasterizerState* _pRasterizerState;
-        private unsafe ID3D11BlendState* _pBlendState;
-        private unsafe ID3D11DepthStencilState* _pDepthStencilState;
+        private unsafe IDXGIFactory* _factory;
+        private unsafe ID3D11Buffer* _vertexBuffer;
+        private unsafe ID3D11Buffer* _indexBuffer;
+        private unsafe ID3D11VertexShader* _vertexShader;
+        private unsafe ID3D11InputLayout* _inputLayout;
+        private unsafe ID3D11Buffer* _vertexConstantBuffer;
+        private unsafe ID3D11PixelShader* _pixelShader;
+        private unsafe ID3D11SamplerState* _fontSampler;
+        private unsafe ID3D11ShaderResourceView* _fontTextureView;
+        private unsafe ID3D11RasterizerState* _rasterizerState;
+        private unsafe ID3D11BlendState* _blendState;
+        private unsafe ID3D11DepthStencilState* _depthStencilState;
         private int _vertexBufferSize;
         private int _indexBufferSize;
         private bool _backupState;
@@ -64,14 +64,14 @@ namespace ImGuiBackends.Direct3D11
             uint stride = (uint)sizeof(ImDrawVert);
             uint offset = 0;
 
-            _deviceContext->IASetInputLayout(_pInputLayout);
-            _deviceContext->IASetVertexBuffers(0, 1, ref _pVB, &stride, &offset);
-            _deviceContext->IASetIndexBuffer(_pIB, sizeof(ushort) == 2 ? Format.FormatR16Uint : Format.FormatR32Uint, 0);
+            _deviceContext->IASetInputLayout(_inputLayout);
+            _deviceContext->IASetVertexBuffers(0, 1, ref _vertexBuffer, &stride, &offset);
+            _deviceContext->IASetIndexBuffer(_indexBuffer, sizeof(ushort) == 2 ? Format.FormatR16Uint : Format.FormatR32Uint, 0);
             _deviceContext->IASetPrimitiveTopology(D3DPrimitiveTopology.D3D11PrimitiveTopologyTrianglelist);
-            _deviceContext->VSSetShader(_pVertexShader, null, 0);
-            _deviceContext->VSSetConstantBuffers(0, 1, ref _pVertexConstantBuffer);
-            _deviceContext->PSSetShader(_pPixelShader, null, 0);
-            _deviceContext->PSSetSamplers(0, 1, ref _pFontSampler);
+            _deviceContext->VSSetShader(_vertexShader, null, 0);
+            _deviceContext->VSSetConstantBuffers(0, 1, ref _vertexConstantBuffer);
+            _deviceContext->PSSetShader(_pixelShader, null, 0);
+            _deviceContext->PSSetSamplers(0, 1, ref _fontSampler);
             _deviceContext->GSSetShader(null, null, 0);
             _deviceContext->HSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
             _deviceContext->DSSetShader(null, null, 0); // In theory we should backup and restore this as well.. very infrequently used..
@@ -79,10 +79,10 @@ namespace ImGuiBackends.Direct3D11
 
             // Setup blend state
             Vector4 blendFactor = new(0, 0, 0, 0);
-            _deviceContext->OMSetBlendState(_pBlendState, (float*)&blendFactor, 0xffffffff);
+            _deviceContext->OMSetBlendState(_blendState, (float*)&blendFactor, 0xffffffff);
 
-            _deviceContext->OMSetDepthStencilState(_pDepthStencilState, 0);
-            _deviceContext->RSSetState(_pRasterizerState);
+            _deviceContext->OMSetDepthStencilState(_depthStencilState, 0);
+            _deviceContext->RSSetState(_rasterizerState);
         }
 
         public unsafe void RenderDrawData(ImDrawDataPtr drawData)
@@ -98,12 +98,12 @@ namespace ImGuiBackends.Direct3D11
 
             //  Create and grow vertex/index buffers if needed
             // vertex buffers
-            if (_pVB == null || _vertexBufferSize < drawData.TotalVtxCount)
+            if (_vertexBuffer == null || _vertexBufferSize < drawData.TotalVtxCount)
             {
-                if (_pVB != null)
+                if (_vertexBuffer != null)
                 {
-                    _pVB->Release();
-                    _pVB = null;
+                    _vertexBuffer->Release();
+                    _vertexBuffer = null;
                 }
 
                 _vertexBufferSize = drawData.TotalVtxCount + 5000;
@@ -117,16 +117,16 @@ namespace ImGuiBackends.Direct3D11
                     MiscFlags = 0,
                 };
 
-                if (CheckDxError(_pd3dDevice->CreateBuffer(&desc, null, ref _pVB), "Grow VB"))
+                if (CheckDxError(_device->CreateBuffer(&desc, null, ref _vertexBuffer), "Grow VB"))
                     return;
             }
 
-            if (_pIB == null || _indexBufferSize < drawData.TotalIdxCount)
+            if (_indexBuffer == null || _indexBufferSize < drawData.TotalIdxCount)
             {
-                if (_pIB != null)
+                if (_indexBuffer != null)
                 {
-                    _pIB->Release();
-                    _pIB = null;
+                    _indexBuffer->Release();
+                    _indexBuffer = null;
                 }
                 _indexBufferSize = drawData.TotalIdxCount + 10000;
 
@@ -139,19 +139,19 @@ namespace ImGuiBackends.Direct3D11
                     MiscFlags = 0,
                 };
 
-                if (CheckDxError(_pd3dDevice->CreateBuffer(&desc, null, ref _pIB), "Grow IB"))
+                if (CheckDxError(_device->CreateBuffer(&desc, null, ref _indexBuffer), "Grow IB"))
                     return;
             }
 
             // upload vertex/index data into a single contiguous GPU buffer
             {
                 MappedSubresource vtxResource = new(), idxResource = new();
-                if (_pVB == null || _pIB == null)
+                if (_vertexBuffer == null || _indexBuffer == null)
                     return;
                 // if this doesn't work then we need to queryinterface :(
-                if (CheckDxError(deviceContext->Map((ID3D11Resource*)_pVB, 0, Map.MapWriteDiscard, 0, &vtxResource), "Map VTX"))
+                if (CheckDxError(deviceContext->Map((ID3D11Resource*)_vertexBuffer, 0, Map.MapWriteDiscard, 0, &vtxResource), "Map VTX"))
                     return;
-                if (CheckDxError(deviceContext->Map((ID3D11Resource*)_pIB, 0, Map.MapWriteDiscard, 0, &idxResource), "Map IDX"))
+                if (CheckDxError(deviceContext->Map((ID3D11Resource*)_indexBuffer, 0, Map.MapWriteDiscard, 0, &idxResource), "Map IDX"))
                     return;
 
                 ImDrawVert* vtxDst = (ImDrawVert*)vtxResource.PData;
@@ -172,8 +172,8 @@ namespace ImGuiBackends.Direct3D11
                     idxDst += cmdList.IdxBuffer.Size;
                 }
 
-                deviceContext->Unmap((ID3D11Resource*)_pVB, 0);
-                deviceContext->Unmap((ID3D11Resource*)_pIB, 0);
+                deviceContext->Unmap((ID3D11Resource*)_vertexBuffer, 0);
+                deviceContext->Unmap((ID3D11Resource*)_indexBuffer, 0);
             }
 
             // Setup orthographic projection matrix into our constant buffer
@@ -181,7 +181,7 @@ namespace ImGuiBackends.Direct3D11
             // DisplayPos is (0,0) for single viewport apps.
             {
                 MappedSubresource projectionMatrix = new();
-                if (CheckDxError(deviceContext->Map((ID3D11Resource*)_pVertexConstantBuffer, 
+                if (CheckDxError(deviceContext->Map((ID3D11Resource*)_vertexConstantBuffer, 
                     0, Map.MapWriteDiscard, 0, &projectionMatrix), "Map Projection Matrix"))
                     return;
 
@@ -198,7 +198,7 @@ namespace ImGuiBackends.Direct3D11
                 };
 
                 Buffer.MemoryCopy(mvp, projectionMatrix.PData, 16 * sizeof(float), 16 * sizeof(float));
-                deviceContext->Unmap((ID3D11Resource*)_pVertexConstantBuffer, 0);
+                deviceContext->Unmap((ID3D11Resource*)_vertexConstantBuffer, 0);
             }
 
             using D3D11StateBackup backup = this.StateBackup();
@@ -335,33 +335,33 @@ namespace ImGuiBackends.Direct3D11
 
         public unsafe void InvalidateDeviceObjects()
         {
-            if (_pd3dDevice == null)
+            if (_device == null)
                 return;
 
-            if (_pFontSampler != null) { _pFontSampler->Release(); _pFontSampler = null; }
-            if (_pFontTextureView != null) 
+            if (_fontSampler != null) { _fontSampler->Release(); _fontSampler = null; }
+            if (_fontTextureView != null) 
             {
-                _pFontTextureView->Release(); 
-                _pFontTextureView = null;
+                _fontTextureView->Release(); 
+                _fontTextureView = null;
                 // We copied data->pFontTextureView to io.Fonts->TexID so let's clear that as well.
                 ImGui.GetIO().Fonts.SetTexID((nint)0);  
             } 
-            if (_pIB != null) { _pIB->Release(); _pIB = null; }
-            if (_pVB != null) { _pVB->Release(); _pVB = null; }
-            if (_pBlendState != null) { _pBlendState->Release(); _pBlendState = null; }
-            if (_pDepthStencilState != null) { _pDepthStencilState->Release(); _pDepthStencilState = null; }
-            if (_pRasterizerState != null) { _pRasterizerState->Release(); _pRasterizerState = null; }
-            if (_pPixelShader != null) { _pPixelShader->Release(); _pPixelShader = null; }
-            if (_pVertexConstantBuffer != null) { _pVertexConstantBuffer->Release(); _pVertexConstantBuffer = null; }
-            if (_pInputLayout != null) { _pInputLayout->Release(); _pInputLayout = null; }
-            if (_pVertexShader != null) { _pVertexShader->Release(); _pVertexShader = null; }
+            if (_indexBuffer != null) { _indexBuffer->Release(); _indexBuffer = null; }
+            if (_vertexBuffer != null) { _vertexBuffer->Release(); _vertexBuffer = null; }
+            if (_blendState != null) { _blendState->Release(); _blendState = null; }
+            if (_depthStencilState != null) { _depthStencilState->Release(); _depthStencilState = null; }
+            if (_rasterizerState != null) { _rasterizerState->Release(); _rasterizerState = null; }
+            if (_pixelShader != null) { _pixelShader->Release(); _pixelShader = null; }
+            if (_vertexConstantBuffer != null) { _vertexConstantBuffer->Release(); _vertexConstantBuffer = null; }
+            if (_inputLayout != null) { _inputLayout->Release(); _inputLayout = null; }
+            if (_vertexShader != null) { _vertexShader->Release(); _vertexShader = null; }
         }
 
         public unsafe bool CreateDeviceObjects()
         {
-            if (_pd3dDevice == null)
+            if (_device == null)
                 return false;
-            if (_pFontSampler != null)
+            if (_fontSampler != null)
                 this.InvalidateDeviceObjects();
 
             // Create the vertex buffer
@@ -369,8 +369,8 @@ namespace ImGuiBackends.Direct3D11
             {
                 nuint vertexBufferSize = (nuint)(sizeof(byte) * ShaderBlobs.VertexBuffer.Length);
                 // Shader blobs are precompiled so no need to release the compiled shader.
-                if (CheckDxError(_pd3dDevice->CreateVertexShader(vertexBuffer,
-                       vertexBufferSize, null, ref _pVertexShader), "Create Vertex Shader"))
+                if (CheckDxError(_device->CreateVertexShader(vertexBuffer,
+                       vertexBufferSize, null, ref _vertexShader), "Create Vertex Shader"))
                     return false;
   
                 InputElementDesc* localLayout = stackalloc InputElementDesc[]
@@ -379,7 +379,7 @@ namespace ImGuiBackends.Direct3D11
                     new(CSTR_TEXCOORD, 0, Format.FormatR32G32Float, 0, (uint)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.uv)), InputClassification.InputPerVertexData, 0),
                     new(CSTR_COLOR, 0, Format.FormatR8G8B8A8Unorm, 0, (uint)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.col)), InputClassification.InputPerVertexData, 0)
                 };
-                if (CheckDxError(_pd3dDevice->CreateInputLayout(localLayout, 3, vertexBuffer, vertexBufferSize, ref _pInputLayout), 
+                if (CheckDxError(_device->CreateInputLayout(localLayout, 3, vertexBuffer, vertexBufferSize, ref _inputLayout), 
                         "Create Input Layout"))
                     return false;
             }
@@ -395,7 +395,7 @@ namespace ImGuiBackends.Direct3D11
                     ByteWidth = 16 * sizeof(float)
                 };
             
-                CheckDxError(_pd3dDevice->CreateBuffer(&desc, null, ref _pVertexConstantBuffer), "Create VertexConstantBuffer");
+                CheckDxError(_device->CreateBuffer(&desc, null, ref _vertexConstantBuffer), "Create VertexConstantBuffer");
             }
 
             // Create the pixel shader
@@ -403,7 +403,7 @@ namespace ImGuiBackends.Direct3D11
             {
                 nuint pixelShaderSize = (nuint)(sizeof(byte) * ShaderBlobs.PixelShader.Length);
 
-                if (CheckDxError(_pd3dDevice->CreatePixelShader(pixelShader, pixelShaderSize, null, ref _pPixelShader), "Create Pixel Shader"))
+                if (CheckDxError(_device->CreatePixelShader(pixelShader, pixelShaderSize, null, ref _pixelShader), "Create Pixel Shader"))
                     return false;
             }
 
@@ -428,7 +428,7 @@ namespace ImGuiBackends.Direct3D11
                     }
                 };
 
-                CheckDxError(_pd3dDevice->CreateBlendState(&desc, ref _pBlendState), "Create Blend State");
+                CheckDxError(_device->CreateBlendState(&desc, ref _blendState), "Create Blend State");
             }
 
             // Create the rasterizer state
@@ -441,7 +441,7 @@ namespace ImGuiBackends.Direct3D11
                     DepthClipEnable = 1,
                 };
 
-                CheckDxError(_pd3dDevice->CreateRasterizerState(&desc, ref _pRasterizerState), "Create Rasterizer State");
+                CheckDxError(_device->CreateRasterizerState(&desc, ref _rasterizerState), "Create Rasterizer State");
             }
 
             // Create depth-stencil State
@@ -468,7 +468,7 @@ namespace ImGuiBackends.Direct3D11
                     }
                 };
 
-                CheckDxError(_pd3dDevice->CreateDepthStencilState(&desc, ref _pDepthStencilState), "Create DS State");
+                CheckDxError(_device->CreateDepthStencilState(&desc, ref _depthStencilState), "Create DS State");
             }
 
             this.CreateFontsTexture();
@@ -483,7 +483,8 @@ namespace ImGuiBackends.Direct3D11
         public unsafe void Init(ID3D11Device* device, ID3D11DeviceContext* deviceContext, bool backupState = true)
         {
             var io = ImGui.GetIO();
-            io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasViewports;  // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
+            // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
+            io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasViewports; 
 
             this._backupState = backupState;
 
@@ -501,16 +502,16 @@ namespace ImGuiBackends.Direct3D11
                 {
                     if (pDXGIAdapter->GetParent(&guidIDXGIFactory, (void**)&pFactory) == 0)
                     {
-                        _pd3dDevice = device;
+                        this._device = device;
                         _deviceContext = deviceContext;
-                        _pFactory = pFactory;
+                        _factory = pFactory;
                     }
                 }
             }
 
             if (pDXGIDevice != null) pDXGIDevice->Release();
             if (pDXGIAdapter != null) pDXGIAdapter->Release();
-            _pd3dDevice->AddRef();
+            device->AddRef();
             _deviceContext->AddRef();
 
             if (io.ConfigFlags.HasFlag(ImGuiConfigFlags.ViewportsEnable)) this.InitPlatformInterface();
@@ -520,14 +521,14 @@ namespace ImGuiBackends.Direct3D11
         {
             this.ShutdownPlatformInterface();
             this.InvalidateDeviceObjects();
-            if (_pFactory != null) _pFactory->Release();
-            if (_pd3dDevice != null) _pd3dDevice->Release();
+            if (_factory != null) _factory->Release();
+            if (_device != null) _device->Release();
             if (_deviceContext != null) _deviceContext->Release();
         }
 
         public unsafe void NewFrame()
         {
-            if (_pFontSampler == null)
+            if (_fontSampler == null)
                 this.CreateDeviceObjects();
         }
 
@@ -562,7 +563,7 @@ namespace ImGuiBackends.Direct3D11
                     SysMemSlicePitch = 0,
                 };
 
-                CheckDxError(_pd3dDevice->CreateTexture2D(&desc, &subResource, &pTexture), "Create Font Tex2D");
+                CheckDxError(_device->CreateTexture2D(&desc, &subResource, &pTexture), "Create Font Tex2D");
 
                 // todo: check error
                 if (pTexture == null)
@@ -580,10 +581,10 @@ namespace ImGuiBackends.Direct3D11
                 };
 
                 // todo: check if cast is proper
-                CheckDxError(_pd3dDevice->CreateShaderResourceView((ID3D11Resource*)pTexture, &srvDesc, ref _pFontTextureView), "Create Font SRV Tex2D");
+                CheckDxError(_device->CreateShaderResourceView((ID3D11Resource*)pTexture, &srvDesc, ref _fontTextureView), "Create Font SRV Tex2D");
                 pTexture->Release();
 
-                io.Fonts.SetTexID((nint)_pFontTextureView);
+                io.Fonts.SetTexID((nint)_fontTextureView);
                 io.Fonts.ClearTexData();
             }
 
@@ -601,7 +602,7 @@ namespace ImGuiBackends.Direct3D11
                     MaxLOD = 0,
                 };
 
-                CheckDxError(_pd3dDevice->CreateSamplerState(&desc, ref _pFontSampler), "Create Text Sampler");
+                CheckDxError(_device->CreateSamplerState(&desc, ref _fontSampler), "Create Text Sampler");
             }
         }
 

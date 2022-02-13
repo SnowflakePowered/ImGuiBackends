@@ -80,14 +80,14 @@ namespace ImGuiBackends.Direct3D11
                 Flags = 0
             };
 
-            _pFactory->CreateSwapChain((IUnknown*)_pd3dDevice, &desc, &vd->SwapChain);
+            _factory->CreateSwapChain((IUnknown*)_device, &desc, &vd->SwapChain);
 
             if (vd->SwapChain != null)
             {
                 ID3D11Texture2D* pBackBuffer = null;
                 Guid tex2DRiid = ID3D11Texture2D.Guid;
                 vd->SwapChain->GetBuffer(0, &tex2DRiid, (void**)&pBackBuffer);
-                _pd3dDevice->CreateRenderTargetView((ID3D11Resource*)pBackBuffer, null, &vd->RTView);
+                _device->CreateRenderTargetView((ID3D11Resource*)pBackBuffer, null, &vd->RTView);
                 pBackBuffer->Release();
             }
         }
@@ -137,7 +137,7 @@ namespace ImGuiBackends.Direct3D11
                     CheckDxError(-1, "DX11 SetWindowSize() failed creating buffers.");
                     return;
                 }
-                _pd3dDevice->CreateRenderTargetView((ID3D11Resource*)pBackBuffer, null, &viewportData->RTView);
+                _device->CreateRenderTargetView((ID3D11Resource*)pBackBuffer, null, &viewportData->RTView);
                 pBackBuffer->Release();
             }
         }
